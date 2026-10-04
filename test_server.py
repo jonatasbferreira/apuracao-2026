@@ -42,6 +42,27 @@ class ResultsTests(unittest.TestCase):
                 candidate["vap"] = "0"
         self.assertTrue(all(c["rank"] is None for c in self.normalize(data)["candidates"]))
 
+    def test_party_and_federation_ranks_include_all_candidates_and_ties(self):
+        data = fixture()
+        group = data["carg"][0]["agr"][0]
+        group.update({"tp": "f", "n": "101", "nm": "Federacao teste"})
+        group["par"][0]["cand"].append({"n": "1003", "nmu": "C", "vap": "100"})
+        candidates = {c["number"]: c for c in self.normalize(data)["candidates"]}
+        self.assertEqual(candidates["1001"]["partyRank"], 1)
+        self.assertEqual(candidates["2001"]["partyRank"], 1)
+        self.assertEqual(candidates["1003"]["partyRank"], 2)
+        self.assertEqual(candidates["1003"]["federationRank"], 3)
+        self.assertEqual(candidates["1001"]["federationRank"], 1)
+        self.assertEqual(candidates["2001"]["federationRank"], 1)
+        self.assertIsNone(candidates["1002"]["partyRank"])
+        self.assertIsNone(candidates["1002"]["federationRank"])
+        self.assertEqual(candidates["1003"]["federation"], "Federacao teste")
+
+    def test_independent_parties_do_not_have_federation_rank(self):
+        candidates = self.normalize(fixture())["candidates"]
+        self.assertTrue(all(c["federationRank"] is None for c in candidates))
+        self.assertEqual(candidates[0]["partyRank"], 1)
+
     def test_catalog_resolves_codes_and_isolates_failed_cargo(self):
         config = {"pl": [{"c": "ele2026", "e": [{"cd": "9999", "t": "1", "abr": [{"cp": [{"cd": "6"}]}]}]}]}
         paths = []

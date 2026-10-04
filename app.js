@@ -28,10 +28,12 @@ const decimal = new Intl.NumberFormat('pt-BR', {minimumFractionDigits:2, maximum
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save() {try {localStorage.setItem('apuracao-ce-v1', JSON.stringify(settings));} catch {}}
 function row(candidate, pinned) {
+  const partyPosition = candidate.partyRank ? `<span class="party-position" title="Posição por votos entre todos os candidatos do ${esc(candidate.party)} neste cargo e estado. Empates compartilham a posição; não indica eleição.">${candidate.partyRank}º no ${esc(candidate.party)}</span>` : '';
+  const federationPosition = candidate.federationRank ? `<span class="federation-position" title="${esc(candidate.federation)} · posição por votos entre os candidatos dos partidos integrantes. Não indica eleição.">${candidate.federationRank}º na federação</span>` : '';
   return `<div class="candidate ${pinned ? 'pinned' : ''}" data-number="${esc(candidate.number)}">
-    <div class="rank">${candidate.rank ? candidate.rank + 'º' : '—'}</div>
+    <div class="rank" title="Colocação geral por votos">${candidate.rank ? candidate.rank + 'º' : '—'}</div>
     <img class="portrait" src="${esc(candidate.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">
-    <div class="person"><div class="name">${esc(candidate.name)}</div><div class="details"><span>${esc(candidate.number)} · ${esc(candidate.party)}</span>${pinned ? '<span class="pin">Fixado</span>' : ''}${candidate.status ? `<span class="status-label">${esc(candidate.status)}</span>` : candidate.elected ? '<span class="status-label">Eleito</span>' : ''}</div></div>
+    <div class="person"><div class="name">${esc(candidate.name)}</div><div class="details"><span>${esc(candidate.number)} · ${esc(candidate.party)}</span>${pinned ? '<span class="pin">Fixado</span>' : ''}${candidate.status ? `<span class="status-label">${esc(candidate.status)}</span>` : candidate.elected ? '<span class="status-label">Eleito</span>' : ''}</div>${partyPosition||federationPosition ? `<div class="party-positions">${partyPosition}${federationPosition}</div>` : ''}</div>
     <div class="numbers"><div class="votes">${integer.format(candidate.votes)}</div><div class="percent">${decimal.format(candidate.percent)}%</div></div></div>`;
 }
 function renderRace(id) {

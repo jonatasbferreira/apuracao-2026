@@ -1,6 +1,27 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const client = require('./tse-client.js');
+test('deputy party ranks and federation ranks cover all members and tied votes',()=>{
+  const cand = (n,vap)=>({n,nmu:n,vap});
+  const data = {carg:[{cd:'6',agr:[{tp:'f',n:'101',nm:'Federacao teste',par:[
+    {n:'13',sg:'PT',cand:[cand('1301',100),cand('1302',60),cand('1303',0)]},
+    {n:'43',sg:'PV',cand:[cand('4301',100),cand('4302',80)]}
+  ]},{tp:'i',par:[{n:'22',sg:'PL',cand:[cand('2201',200)]}]}]}],s:{},v:{}};
+  const race = client.normalize(data,'6',{cycle:'ele2026',code:'6259'},'ce','sample.json');
+  const byNumber = Object.fromEntries(race.candidates.map(c=>[c.number,c]));
+  assert.equal(byNumber['1302'].partyRank,2);
+  assert.equal(byNumber['1302'].federationRank,4);
+  assert.equal(byNumber['4302'].federationRank,3);
+  assert.equal(byNumber['1301'].federationRank,1);
+  assert.equal(byNumber['4301'].federationRank,1);
+  assert.equal(byNumber['2201'].partyRank,1);
+  assert.equal(byNumber['2201'].federationRank,null);
+  assert.equal(byNumber['1303'].partyRank,null);
+  assert.equal(byNumber['1303'].federationRank,null);
+  assert.equal(byNumber['1301'].federation,'Federacao teste');
+  data.carg[0].cd='7';
+  assert.equal(client.normalize(data,'7',{cycle:'ele2026',code:'6259'},'ce','sample.json').candidates.find(c=>c.number==='1302').partyRank,2);
+});
 test('browser parser ranks candidates and preserves white votes and totalized sections',()=>{
   const candidate = (n,vap,pvap)=>({n,nmu:'Pessoa '+n,vap,pvap});
   const data = {carg:[{cd:'1',agr:[{par:[{sg:'PT',cand:[candidate('13','10','50,00'),candidate('14','10','50,00'),candidate('15','0','0')]}]}]}],s:{st:'5',ts:'100',pst:'5,00',psa:'100,00'},v:{tv:'22',vb:'2',pvb:'9,09',tvn:'0',ptvn:'0'}};

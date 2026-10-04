@@ -62,6 +62,9 @@ def normalize(data, cargo, ciclo, election, uf, path):
                         "number": str(candidate["n"]),
                         "name": candidate.get("nmu") or candidate.get("nm", ""),
                         "party": party.get("sg", ""),
+                        "partyKey": str(party.get("n") or party.get("sg", "")),
+                        "federation": group.get("nm", "") if group.get("tp") == "f" else "",
+                        "federationKey": str(group.get("n") or group.get("nm", "")) if group.get("tp") == "f" else "",
                         "votes": int(candidate.get("vap") or 0),
                         "percent": number(candidate.get("pvap")),
                         "status": candidate.get("st") or "",
@@ -76,6 +79,19 @@ def normalize(data, cargo, ciclo, election, uf, path):
             rank = index + 1
             last_votes = candidate["votes"]
         candidate["rank"] = rank if candidate["votes"] > 0 else None
+    if cargo in ("6", "7"):
+        for key, field in (("partyKey", "partyRank"), ("federationKey", "federationRank")):
+            groups = {}
+            for candidate in candidates:
+                candidate[field] = None
+                if candidate[key]:
+                    groups.setdefault(candidate[key], []).append(candidate)
+            for members in groups.values():
+                last_votes, rank = None, 0
+                for index, candidate in enumerate(members):
+                    if candidate["votes"] != last_votes:
+                        rank, last_votes = index + 1, candidate["votes"]
+                    candidate[field] = rank if candidate["votes"] > 0 else None
     votes, sections = data.get("v", {}), data.get("s", {})
     return {
         "id": cargo, "name": CARGOS[cargo], "uf": uf.upper(),

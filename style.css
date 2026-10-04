@@ -19,5 +19,8 @@ dialog{border:1px solid var(--border);border-radius:8px;padding:20px;max-width:5
 .state-preview{left:20px;bottom:20px;width:360px;min-height:285px;border-top:3px solid var(--green)}
 .map-state.state-selected{stroke:#172f28;stroke-width:3.5;filter:brightness(.88)}
 .map-label.state-selected{font-weight:800;fill:#102f24}
+.party-positions{display:flex;flex-wrap:wrap;gap:3px 8px;margin-top:4px;font-size:11px;line-height:1.4;font-variant-numeric:tabular-nums}
+.party-position{color:#176b52;font-weight:700;overflow-wrap:anywhere}
+.federation-position{color:#65517b;overflow-wrap:anywhere}
 .state-name.state-selected,.map-state-list button.state-selected{background:#d2e8dc;box-shadow:inset 0 0 0 2px var(--green)}
 @media(max-width:640px){.state-preview{left:12px;bottom:12px;width:calc(100% - 24px);min-height:260px}.preview-candidate{padding:9px 0}}

@@ -66,6 +66,11 @@ O segundo turno pode ficar indisponivel ate o TSE publicar o catalogo e os
 arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
 # Versao online
 
+Deputados federais e estaduais exibem colocacao geral, no partido e, quando
+aplicavel, na federacao. O calculo inclui todos os candidatos do cargo no estado,
+nao apenas os exibidos. Votos iguais compartilham a posicao; sem votos nao ha
+colocacao. Esses rankings nao substituem a situacao oficial de eleicao do TSE.
+
 https://jonatasbferreira.github.io/apuracao-2026/
 
 Hospedada no GitHub Pages. A versao online consulta os arquivos oficiais do TSE
