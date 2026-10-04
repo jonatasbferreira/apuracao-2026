@@ -71,7 +71,9 @@ function renderRace(id) {
     <div class="timestamps">${race ? `${integer.format(race.sections)} de ${integer.format(race.totalSections)} seções · <a href="${esc(race.source)}" target="_blank" rel="noopener noreferrer">Fonte TSE ↗</a><br>Arquivo TSE: ${esc(race.generated)}${race.totalized ? `<br>Totalização TSE: ${esc(race.totalized)}` : ''}` : 'Aguardando publicação do TSE'}</div></section>`;
 }
 function render() {
+  const openSeats = new Set([...document.querySelectorAll('.race')].filter(section=>section.querySelector('.seats-details')?.open).map(section=>section.dataset.id));
   $('dashboard').innerHTML = ['1','3','5','6','7'].map(renderRace).join('');
+  document.querySelectorAll('.race').forEach(section=>{const details=section.querySelector('.seats-details');if(details)details.open=openSeats.has(section.dataset.id);});
   document.querySelectorAll('img.portrait').forEach(img => img.addEventListener('error', () => {img.removeAttribute('src'); img.style.visibility = 'hidden';}, {once:true}));
   document.querySelectorAll('[data-pick]').forEach(button => button.addEventListener('click', () => openPicker(button.dataset.pick)));
   $('president-scope').addEventListener('change', e => {settings.president = e.target.value; resetQuery('1');});
