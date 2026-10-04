@@ -66,6 +66,14 @@ O segundo turno pode ficar indisponivel ate o TSE publicar o catalogo e os
 arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
 # Versao online
 
+Capitao Wagner (445) tambem fica fixado no Senado. A atualizacao adiciona esse
+favorito uma vez aos navegadores com preferencias antigas, preservando as demais
+selecoes. Ele pode ser removido normalmente no seletor de candidatos.
+
+Deputados exibem vagas do partido ou federacao na parcial do TSE, separadas da
+contagem de candidatos que o TSE ja marca como eleitos. O resumo expansivel de
+vagas lista os grupos sem duplicar vagas entre partidos da mesma federacao.
+
 Deputados federais e estaduais exibem colocacao geral, no partido e, quando
 aplicavel, na federacao. O calculo inclui todos os candidatos do cargo no estado,
 nao apenas os exibidos. Votos iguais compartilham a posicao; sem votos nao ha

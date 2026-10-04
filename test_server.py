@@ -20,6 +20,23 @@ def fixture():
 
 
 class ResultsTests(unittest.TestCase):
+    def test_group_seats_are_partial_and_official_elected_count_is_separate(self):
+        data = fixture()
+        data["carg"][0]["nv"] = "24"
+        group = data["carg"][0]["agr"][0]
+        group.update({"tp": "f", "nm": "Federacao", "com": "A / B", "vag": "3"})
+        group["par"][1]["cand"][0]["e"] = "s"
+        result = self.normalize(data)
+        self.assertEqual(result["totalSeats"], 24)
+        self.assertEqual(len(result["seatGroups"]), 1)
+        self.assertEqual(result["seatGroups"][0]["seats"], 3)
+        self.assertEqual(result["seatGroups"][0]["elected"], 1)
+        self.assertTrue(result["seatGroups"][0]["federation"])
+        self.assertEqual(result["candidates"][0]["groupSeats"], 3)
+        self.assertFalse(result["candidates"][0]["seatsFinal"])
+        del group["vag"]
+        self.assertIsNone(self.normalize(data)["seatGroups"][0]["seats"])
+
     def normalize(self, data):
         return server.normalize(data, "6", "ele2026", "6259", "ce", "sample.json")
 

@@ -38,9 +38,12 @@
   }
   function normalize(data,cargo,entry,uf,path) {
     if (!Array.isArray(data.carg) || !data.s || !data.v) throw new Error('Resposta incompleta do TSE.');
+    const cargoData = data.carg.find(c=>String(c.cd)===cargo);
+    const proportional = ['6','7'].includes(cargo);
     const candidates = data.carg.filter(c=>String(c.cd)===cargo).flatMap(c=>(c.agr || []).flatMap(g=>(g.par || []).flatMap(p=>(p.cand || []).map(c=>({
       number:String(c.n),name:c.nmu || c.nm || '',party:p.sg || '',votes:number(c.vap),percent:number(c.pvap),status:c.st || '',elected:c.e==='s',
       partyKey:String(p.n || p.sg || ''),federation:g.tp==='f' ? g.nm || '' : '',federationKey:g.tp==='f' ? String(g.n || g.nm || '') : '',
+      groupSeats:proportional && g.vag!=null && g.vag!=='' ? number(g.vag) : null,seatsFinal:data.tf==='s',
       photo:/^\d+$/.test(String(c.sqcand || '')) ? `${base}${entry.cycle}/${entry.code}/fotos/${uf}/${c.sqcand}.jpeg` : ''
     })))));
     candidates.sort((a,b)=>b.votes-a.votes || a.name.localeCompare(b.name) || a.number.localeCompare(b.number));
@@ -65,7 +68,8 @@
       }
     }
     const s = data.s, v = data.v;
-    return {id:cargo,name:cargos[cargo],uf:uf.toUpperCase(),candidates,source:base+path,generated:generated(data),totalized:`${data.dt || ''} ${data.ht || ''}`.trim(),generationId:data.idg,
+    const seatGroups = proportional ? (cargoData?.agr || []).map(g=>({name:g.nm || g.com || '',label:g.com || (g.par || []).map(p=>p.sg).join(' / '),federation:g.tp==='f',seats:g.vag!=null && g.vag!=='' ? number(g.vag) : null,elected:(g.par || []).reduce((sum,p)=>sum+(p.cand || []).filter(c=>c.e==='s').length,0)})).sort((a,b)=>(b.seats || 0)-(a.seats || 0) || a.label.localeCompare(b.label)) : undefined;
+    return {id:cargo,name:cargos[cargo],uf:uf.toUpperCase(),candidates,seatGroups,totalSeats:proportional && cargoData?.nv!=null && cargoData.nv!=='' ? number(cargoData.nv) : null,source:base+path,generated:generated(data),totalized:`${data.dt || ''} ${data.ht || ''}`.trim(),generationId:data.idg,
       sections:number(s.st),totalSections:number(s.ts),sectionPercent:number(s.pst),totalVotes:number(v.tv),whiteVotes:number(v.vb),whitePercent:number(v.pvb),nullVotes:number(v.tvn),nullPercent:number(v.ptvn),finished:data.tf==='s'};
   }
   function tracking(data,path) {

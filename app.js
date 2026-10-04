@@ -2,8 +2,8 @@ const $ = id => document.getElementById(id);
 const directTSE = !['127.0.0.1','localhost','::1'].includes(location.hostname);
 const titles = {'1':'Presidente', '3':'Governador', '5':'Senador', '6':'Deputado federal', '7':'Deputado estadual'};
 const colors = {'1':'#337e98', '3':'#21725b', '5':'#b18c32', '6':'#456d91', '7':'#8c5e78'};
-const defaults = {'1':[], '3':['45','13','14'], '5':['400','222','300','180'], '6':['2277'], '7':['22777']};
-let settings = {turn:'1', president:'br', auto:false, view:'regions', mapColor:'progress', pins:structuredClone(defaults)};
+const defaults = {'1':[], '3':['45','13','14'], '5':['400','222','300','180','445'], '6':['2277'], '7':['22777']};
+let settings = {turn:'1', president:'br', auto:false, view:'regions', mapColor:'progress', pinsVersion:0, pins:structuredClone(defaults)};
 try {
   const saved = JSON.parse(localStorage.getItem('apuracao-ce-v1'));
   if (saved) {
@@ -12,11 +12,17 @@ try {
     settings.auto = saved.auto === true;
     settings.view = saved.view === 'map' ? 'map' : 'regions';
     settings.mapColor = saved.mapColor === 'region' ? 'region' : 'progress';
+    settings.pinsVersion = Number(saved.pinsVersion) || 0;
     for (const id of Object.keys(defaults)) {
       if (Array.isArray(saved.pins?.[id])) settings.pins[id] = saved.pins[id].filter(n => /^\d+$/.test(n));
     }
   }
 } catch {}
+if (settings.pinsVersion<1) {
+  if (!settings.pins['5'].includes('445')) settings.pins['5'].push('445');
+  settings.pinsVersion=1;
+  save();
+}
 let races = {}, errors = {}, busy = false, due = Date.now() + 11000, pickerId, draftPins;
 let controller = null, epoch = 0, consulted = null;
 let overview = null, overviewError = '';
@@ -30,11 +36,17 @@ function save() {try {localStorage.setItem('apuracao-ce-v1', JSON.stringify(sett
 function row(candidate, pinned) {
   const partyPosition = candidate.partyRank ? `<span class="party-position" title="Posição por votos entre todos os candidatos do ${esc(candidate.party)} neste cargo e estado. Empates compartilham a posição; não indica eleição.">${candidate.partyRank}º no ${esc(candidate.party)}</span>` : '';
   const federationPosition = candidate.federationRank ? `<span class="federation-position" title="${esc(candidate.federation)} · posição por votos entre os candidatos dos partidos integrantes. Não indica eleição.">${candidate.federationRank}º na federação</span>` : '';
+  const seats = candidate.groupSeats!=null ? `<div class="candidate-seats" title="Vagas informadas pelo TSE para o partido ou federação neste cargo. Durante a apuração, podem mudar.">${esc(candidate.federation ? 'Federação' : candidate.party)}: <strong>${integer.format(candidate.groupSeats)} vagas ${candidate.seatsFinal ? 'TSE' : 'na parcial'}</strong></div>` : '';
   return `<div class="candidate ${pinned ? 'pinned' : ''}" data-number="${esc(candidate.number)}">
     <div class="rank" title="Colocação geral por votos">${candidate.rank ? candidate.rank + 'º' : '—'}</div>
     <img class="portrait" src="${esc(candidate.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">
-    <div class="person"><div class="name">${esc(candidate.name)}</div><div class="details"><span>${esc(candidate.number)} · ${esc(candidate.party)}</span>${pinned ? '<span class="pin">Fixado</span>' : ''}${candidate.status ? `<span class="status-label">${esc(candidate.status)}</span>` : candidate.elected ? '<span class="status-label">Eleito</span>' : ''}</div>${partyPosition||federationPosition ? `<div class="party-positions">${partyPosition}${federationPosition}</div>` : ''}</div>
+    <div class="person"><div class="name">${esc(candidate.name)}</div><div class="details"><span>${esc(candidate.number)} · ${esc(candidate.party)}</span>${pinned ? '<span class="pin">Fixado</span>' : ''}${candidate.status ? `<span class="status-label">${esc(candidate.status)}</span>` : candidate.elected ? '<span class="status-label">Eleito</span>' : ''}</div>${partyPosition||federationPosition ? `<div class="party-positions">${partyPosition}${federationPosition}</div>` : ''}${seats}</div>
     <div class="numbers"><div class="votes">${integer.format(candidate.votes)}</div><div class="percent">${decimal.format(candidate.percent)}%</div></div></div>`;
+}
+function renderSeats(race) {
+  if (!race?.seatGroups) return '';
+  const elected=race.candidates.filter(candidate=>candidate.elected).length;
+  return `<div class="seats-summary"><span>Eleitos indicados pelo TSE</span><strong>${elected}${race.totalSeats!=null ? ` / ${integer.format(race.totalSeats)}` : ''}</strong></div><details class="seats-details"><summary>Vagas por partido / federação</summary><table class="seats-table"><thead><tr><th>Partido / fed.</th><th>${race.finished ? 'Vagas TSE' : 'Vagas parciais'}</th><th>Eleitos TSE</th></tr></thead><tbody>${race.seatGroups.map(group=>`<tr><th scope="row" title="${esc(group.name)}">${esc(group.label)}${group.federation ? '<small>Federação</small>' : ''}</th><td>${group.seats==null ? '—' : integer.format(group.seats)}</td><td>${integer.format(group.elected)}</td></tr>`).join('')}</tbody></table><p class="seats-note">${race.finished ? 'Situação informada pelo TSE.' : 'Vagas na parcial podem mudar. Eleitos: somente candidatos já marcados pelo TSE.'}</p></details>`;
 }
 function renderRace(id) {
   const race = races[id];
@@ -55,6 +67,7 @@ function renderRace(id) {
     <div class="progress"><span style="width:${race ? Math.min(100, Math.max(0,race.sectionPercent)) : 0}%"></span></div>${message}
     <div class="list">${selected.map(c => row(c, pins.includes(c.number))).join('')}${(!selected.length || top && !hasVotes) ? `<div class="empty">${empty}</div>` : ''}</div>
     <div class="metrics"><div class="metric"><span>Votos brancos</span><strong>${race ? integer.format(race.whiteVotes) : '—'} <small>${race ? decimal.format(race.whitePercent) + '%' : ''}</small></strong></div><div class="metric"><span>Votos nulos</span><strong>${race ? integer.format(race.nullVotes) : '—'} <small>${race ? decimal.format(race.nullPercent) + '%' : ''}</small></strong></div></div>
+    ${['6','7'].includes(id) ? renderSeats(race) : ''}
     <div class="timestamps">${race ? `${integer.format(race.sections)} de ${integer.format(race.totalSections)} seções · <a href="${esc(race.source)}" target="_blank" rel="noopener noreferrer">Fonte TSE ↗</a><br>Arquivo TSE: ${esc(race.generated)}${race.totalized ? `<br>Totalização TSE: ${esc(race.totalized)}` : ''}` : 'Aguardando publicação do TSE'}</div></section>`;
 }
 function render() {

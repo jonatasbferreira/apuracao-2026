@@ -51,10 +51,22 @@ def number(value):
 
 def normalize(data, cargo, ciclo, election, uf, path):
     candidates = []
+    seat_groups = []
+    total_seats = None
     for item in data.get("carg", []):
         if str(item["cd"]) != cargo:
             continue
+        if cargo in ("6", "7") and item.get("nv") not in (None, ""):
+            total_seats = int(item["nv"])
         for group in item.get("agr", []):
+            if cargo in ("6", "7"):
+                seat_groups.append({
+                    "name": group.get("nm") or group.get("com", ""),
+                    "label": group.get("com") or " / ".join(p.get("sg", "") for p in group.get("par", [])),
+                    "federation": group.get("tp") == "f",
+                    "seats": int(group["vag"]) if group.get("vag") not in (None, "") else None,
+                    "elected": sum(c.get("e") == "s" for p in group.get("par", []) for c in p.get("cand", [])),
+                })
             for party in group.get("par", []):
                 for candidate in party.get("cand", []):
                     seq = str(candidate.get("sqcand", ""))
@@ -63,6 +75,8 @@ def normalize(data, cargo, ciclo, election, uf, path):
                         "name": candidate.get("nmu") or candidate.get("nm", ""),
                         "party": party.get("sg", ""),
                         "partyKey": str(party.get("n") or party.get("sg", "")),
+                        "groupSeats": int(group["vag"]) if cargo in ("6", "7") and group.get("vag") not in (None, "") else None,
+                        "seatsFinal": data.get("tf") == "s",
                         "federation": group.get("nm", "") if group.get("tp") == "f" else "",
                         "federationKey": str(group.get("n") or group.get("nm", "")) if group.get("tp") == "f" else "",
                         "votes": int(candidate.get("vap") or 0),
@@ -96,6 +110,8 @@ def normalize(data, cargo, ciclo, election, uf, path):
     return {
         "id": cargo, "name": CARGOS[cargo], "uf": uf.upper(),
         "candidates": candidates, "source": BASE + path,
+        "seatGroups": sorted(seat_groups, key=lambda g: (-(g["seats"] or 0), g["label"])) if cargo in ("6", "7") else None,
+        "totalSeats": total_seats,
         "generated": f"{data.get('dg', '')} {data.get('hg', '')}".strip(),
         "totalized": f"{data.get('dt', '')} {data.get('ht', '')}".strip(),
         "generationId": data.get("idg"),

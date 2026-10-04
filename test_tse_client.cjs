@@ -1,6 +1,24 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const client = require('./tse-client.js');
+test('partial group seats are separate from official elected candidates and federations are not double-counted',()=>{
+  const data={tf:'n',s:{},v:{},carg:[{cd:'6',nv:'24',agr:[{tp:'f',n:'f1',nm:'Federacao',com:'A / B',vag:'3',par:[
+    {sg:'A',cand:[{n:'1001',nmu:'A',vap:100,e:'n'}]},
+    {sg:'B',cand:[{n:'2001',nmu:'B',vap:50,e:'s'}]}
+  ]},{tp:'i',com:'C',par:[{sg:'C',cand:[{n:'3001',vap:10,e:'n'}]}]}]}]};
+  const race=client.normalize(data,'6',{cycle:'ele2026',code:'6259'},'ce','sample.json');
+  assert.equal(race.totalSeats,24);
+  assert.equal(race.seatGroups.length,2);
+  assert.equal(race.seatGroups[0].seats,3);
+  assert.equal(race.seatGroups[0].elected,1);
+  assert.equal(race.seatGroups[0].federation,true);
+  assert.equal(race.seatGroups[1].seats,null);
+  assert.equal(race.candidates[0].groupSeats,3);
+  assert.equal(race.candidates[0].seatsFinal,false);
+  assert.equal(race.candidates[0].elected,false);
+  data.tf='s';
+  assert.equal(client.normalize(data,'6',{cycle:'ele2026',code:'6259'},'ce','sample.json').candidates[0].seatsFinal,true);
+});
 test('deputy party ranks and federation ranks cover all members and tied votes',()=>{
   const cand = (n,vap)=>({n,nmu:n,vap});
   const data = {carg:[{cd:'6',agr:[{tp:'f',n:'101',nm:'Federacao teste',par:[
