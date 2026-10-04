@@ -64,3 +64,14 @@ da totalizacao proporcional. O status vem do TSE, quando publicado.
 
 O segundo turno pode ficar indisponivel ate o TSE publicar o catalogo e os
 arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
+# Versao online
+
+https://jonatasbferreira.github.io/apuracao-2026/
+
+Hospedada no GitHub Pages. A versao online consulta os arquivos oficiais do TSE
+diretamente pelo navegador, sem servidor Python e sem credenciais. Os candidatos
+fixados ficam salvos no navegador de cada pessoa. O checkbox controla consultas
+a cada 11 segundos; a publicacao de novos dados depende do TSE.
+
+Para publicar alteracoes, envie os arquivos para a branch `main`. O GitHub Pages
+publica a raiz dessa branch. A versao local continua usando `server.py`.
