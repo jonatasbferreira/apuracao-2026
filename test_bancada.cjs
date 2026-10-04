@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {simulate,color,national}=require('./bancada.js');
+const {simulate,color,national,senate}=require('./bancada.js');
 const candidate=(number,party,votes,elected=false)=>({number,name:'Pessoa '+number,party,votes,elected});
 test('federation seats are allocated jointly then colored by the selected candidates parties',()=>{
   const model=simulate({totalSeats:5,seatGroups:[{label:'PT / PV',parties:['PT','PV'],seats:3},{label:'PL',parties:['PL'],seats:2}],candidates:[
@@ -47,7 +47,7 @@ test('national simulation allocates seats in each UF and distinguishes repeated 
   assert.equal(model.seats.filter(s=>s.candidate?.uf==='CE').length,1);
 });
 test('46-seat and 513-seat layouts contain exactly that many nonoverlapping circles',()=>{
-  for(const total of [46,513]) {
+  for(const total of [46,81,513]) {
     const model=simulate({totalSeats:total,seatGroups:[],candidates:[]});
     assert.equal(model.seats.length,total);
     assert.ok(model.radius>3);
@@ -56,4 +56,21 @@ test('46-seat and 513-seat layouts contain exactly that many nonoverlapping circ
       for(const b of model.seats)if(a.index!==b.index)assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>model.radius*2);
     }
   }
+});
+test('senate selects two per UF, never proportional party seats, and separates continuing mandates',()=>{
+  const state=(uf,multiplier)=>({uf,seatGroups:[],candidates:[candidate('100','PT',100*multiplier),candidate('200','PL',90*multiplier),candidate('300','PSD',80*multiplier)]});
+  const model=senate([state('CE',1),state('SP',1000),state('CE',1)]);
+  assert.equal(model.total,81);
+  assert.equal(model.defined,4);
+  assert.equal(model.legend.find(item=>item.party==='__retained').seats,27);
+  assert.equal(model.legend.find(item=>item.party==='').seats,50);
+  assert.deepEqual(model.seats.filter(s=>s.candidate).map(s=>s.candidate.key).sort(),['CE:100','CE:200','SP:100','SP:200']);
+  assert.ok(model.seats.filter(s=>s.candidate).every(s=>s.candidate.cargo==='5'));
+});
+test('senate preserves official winners, flags cutoff ties and leaves zero votes pending',()=>{
+  const model=senate([{uf:'CE',candidates:[candidate('100','PT',10),candidate('200','PL',10),candidate('300','PSD',1,true)]},{uf:'SP',candidates:[candidate('100','PT',0)]}]);
+  assert.equal(model.defined,2);
+  assert.ok(model.seats.some(s=>s.candidate?.elected));
+  assert.ok(model.seats.some(s=>s.tied));
+  assert.equal(senate([]).legend.find(item=>item.party==='').seats,54);
 });

@@ -2,6 +2,7 @@
   const colors={PL:'#2476b5',PT:'#cf3546',PSB:'#d49b13',MDB:'#25815a',PSD:'#7162a5',PSOL:'#bd6b1c',REDE:'#3a9c88',PV:'#69932b',PCDOB:'#ac274b',PP:'#397e99','UNIÃO':'#3157a0',PRD:'#ad5786',SOLIDARIEDADE:'#c47a38',PDT:'#984537',REPUBLICANOS:'#578ca7',NOVO:'#bd5d20',PODE:'#71892e',CIDADANIA:'#b24987',PSDB:'#557dba',AVANTE:'#7471a0'};
   const fallback=['#326a79','#925a76','#638342','#a77432','#635a97','#327d69'];
   function color(party) {
+    if(party==='__retained')return '#858d96';
     if(colors[party])return colors[party];
     return fallback[[...party].reduce((sum,c)=>sum+c.charCodeAt(0),0)%fallback.length];
   }
@@ -25,7 +26,7 @@
     seats.sort((a,b)=>a.party.localeCompare(b.party)||a.group.localeCompare(b.group)||(b.candidate?.votes || 0)-(a.candidate?.votes || 0));
     const legend=new Map();
     for(const seat of seats) {
-      if(!legend.has(seat.party))legend.set(seat.party,{party:seat.party,label:seat.party || 'A definir',color:seat.party ? color(seat.party) : '#ccd4d0',seats:0,elected:0});
+      if(!legend.has(seat.party))legend.set(seat.party,{party:seat.party,label:seat.party==='__retained' ? 'Fora da disputa' : seat.party || 'A definir',color:seat.party ? color(seat.party) : '#ccd4d0',seats:0,elected:0});
       const item=legend.get(seat.party);item.seats++;item.elected+=Number(Boolean(seat.candidate?.elected));
     }
     let rows,radii;
@@ -53,6 +54,21 @@
     while(seats.length<513)seats.push({candidate:null,party:'',group:'UF com dados pendentes',tied:false});
     return compose(seats,513);
   }
-  const api={color,simulate,national};
+  function senate(states) {
+    const seats=[],seen=new Set();
+    for(const state of states) {
+      if(!state.uf || ['BR','ZZ'].includes(state.uf) || seen.has(state.uf) || seen.size>=27)continue;
+      seen.add(state.uf);
+      const members=[...state.candidates].sort((a,b)=>Number(b.elected)-Number(a.elected)||b.votes-a.votes||a.name.localeCompare(b.name)||a.number.localeCompare(b.number));
+      for(let index=0;index<2;index++) {
+        const member=members[index],candidate=member?.votes>0 ? {...member,uf:state.uf,key:`${state.uf}:${member.number}`,cargo:'5'} : null;
+        seats.push({candidate,party:candidate?.party || '',group:`Senado · ${state.uf}`,tied:Boolean(candidate&&!candidate.elected&&members[2]?.votes===candidate.votes)});
+      }
+    }
+    while(seats.length<54)seats.push({candidate:null,party:'',group:'Vaga em disputa · dados pendentes',tied:false});
+    for(let index=0;index<27;index++)seats.push({candidate:null,party:'__retained',group:'Mandato em continuidade · fora da disputa de 2026 · partido não representado',tied:false});
+    return compose(seats,81);
+  }
+  const api={color,simulate,national,senate};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Bancada=api;
 })(typeof window!=='undefined' ? window : globalThis);

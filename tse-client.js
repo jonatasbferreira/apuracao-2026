@@ -87,7 +87,7 @@
         const entry = match(entries,cargo), uf = cargo==='1' ? president : 'ce';
         const path = resultPath(entry,cargo,uf);
         const result=normalize(await read(path,signal),cargo,entry,uf,path);
-        if(cargo==='6')federalCache.set(turn+':'+uf,{result,time:Date.now()});
+        if(['5','6'].includes(cargo))federalCache.set(turn+':'+cargo+':'+uf,{result,time:Date.now()});
         return result;
       } catch(error) {return {id:cargo,error:error.message};}
     }));
@@ -108,19 +108,20 @@
     const leaders = result.candidates.some(c=>c.votes>0) ? result.candidates.slice(0,3).map(({number,name,party,votes,percent})=>({number,name,party,votes,percent})) : [];
     return {uf:uf.toUpperCase(),name:names[uf.toUpperCase()],turn,sectionPercent:result.sectionPercent,generated:result.generated,source:result.source,checkedAt:new Date().toISOString(),leaders};
   }
-  async function benches(turn,signal) {
-    const entry=match(await elections(turn,signal),'6');
+  async function benches(turn,signal,cargo='6') {
+    if(!['5','6'].includes(cargo))throw new Error('Cargo inválido para bancada nacional.');
+    const entry=match(await elections(turn,signal),cargo);
     const ufs=Object.keys(names).filter(uf=>!['BR','ZZ'].includes(uf)).map(uf=>uf.toLowerCase());
     const states=[],errors=[];
     let cursor=0;
     await Promise.all(Array.from({length:4},async()=>{
       while(cursor<ufs.length&&!signal?.aborted) {
-        const uf=ufs[cursor++],key=turn+':'+uf,cached=federalCache.get(key);
+        const uf=ufs[cursor++],key=turn+':'+cargo+':'+uf,cached=federalCache.get(key);
         try {
           let result=cached&&Date.now()-cached.time<11000 ? cached.result : null;
           if(!result) {
-            const path=resultPath(entry,'6',uf);
-            result=normalize(await read(path,signal),'6',entry,uf,path);
+            const path=resultPath(entry,cargo,uf);
+            result=normalize(await read(path,signal),cargo,entry,uf,path);
             federalCache.set(key,{result,time:Date.now()});
           }
           states.push(result);

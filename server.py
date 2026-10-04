@@ -219,26 +219,26 @@ def get_results(turn, presidential_uf):
     return {"checkedAt": datetime.now(timezone.utc).isoformat(), "turn": turn, "races": results, "overview": overview}
 
 
-def get_benches(turn):
+def get_benches(turn, cargo="6"):
     elections = get_elections(turn)
     match = next(((cycle, election) for cycle, election in elections
-                  if any(str(c["cd"]) == "6" for a in election.get("abr", []) for c in a.get("cp", []))), None)
+                  if any(str(c["cd"]) == cargo for a in election.get("abr", []) for c in a.get("cp", []))), None)
     if not match:
-        return {"error": "Deputado federal ainda nao foi publicado para este turno."}
+        return {"error": "Cargo ainda nao foi publicado para este turno."}
     cycle, election = match
     code = str(election["cd"])
 
     def load(uf):
-        path = f"{cycle}/{code}/dados/{uf}/{uf}-c0006-e{code.zfill(6)}-u.json"
+        path = f"{cycle}/{code}/dados/{uf}/{uf}-c{cargo.zfill(4)}-e{code.zfill(6)}-u.json"
         try:
-            return uf, normalize(fetch_json(path, ttl=11), "6", cycle, code, uf, path), False
+            return uf, normalize(fetch_json(path, ttl=11), cargo, cycle, code, uf, path), False
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError) as error:
             if isinstance(error, HTTPError):
                 error.close()
             with cache_lock:
                 saved = cache.get(path)
             if saved:
-                return uf, normalize(saved[1], "6", cycle, code, uf, path), True
+                return uf, normalize(saved[1], cargo, cycle, code, uf, path), True
             return uf, None, True
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -253,11 +253,12 @@ class Handler(SimpleHTTPRequestHandler):
         url = urlsplit(self.path)
         if url.path == "/api/benches":
             turn = parse_qs(url.query).get("turn", ["1"])[0]
-            if turn not in ("1", "2"):
+            cargo = parse_qs(url.query).get("cargo", ["6"])[0]
+            if turn not in ("1", "2") or cargo not in ("5", "6"):
                 self.send_json({"error": "Parametros invalidos."}, 400)
                 return
             try:
-                self.send_json(get_benches(turn))
+                self.send_json(get_benches(turn, cargo))
             except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
                 self.send_json({"error": "Nao foi possivel consultar a bancada nacional."}, 502)
         elif url.path == "/api/state":

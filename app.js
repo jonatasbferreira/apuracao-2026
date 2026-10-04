@@ -13,7 +13,7 @@ try {
     settings.view = saved.view === 'map' ? 'map' : 'regions';
     settings.mapColor = saved.mapColor === 'region' ? 'region' : 'progress';
     settings.page=saved.page==='benches' ? 'benches' : 'results';
-    settings.benchMode=['federal-br','state-ce','federal-ce'].includes(saved.benchMode) ? saved.benchMode : 'federal-br';
+    settings.benchMode=['federal-br','state-ce','federal-ce','senate-br'].includes(saved.benchMode) ? saved.benchMode : 'federal-br';
     settings.pinsVersion = Number(saved.pinsVersion) || 0;
     for (const id of Object.keys(defaults)) {
       if (Array.isArray(saved.pins?.[id])) settings.pins[id] = saved.pins[id].filter(n => /^\d+$/.test(n));
@@ -31,7 +31,12 @@ let controller = null, epoch = 0, consulted = null;
 let overview = null, overviewError = '';
 let mapGeometry = null, mapPromise = null, focusedRegion = null;
 let benchParty=null, benchCandidate=null;
-let nationalBench=null, nationalBusy=false, nationalController=null, nationalRequestedAt=0, nationalError='';
+const nationalQueries=new Map();
+function nationalQuery(cargo) {
+  if(!nationalQueries.has(cargo))nationalQueries.set(cargo,{data:null,busy:false,controller:null,requestedAt:0,error:''});
+  return nationalQueries.get(cargo);
+}
+function nationalMode(){return ['federal-br','senate-br'].includes(settings.benchMode);}
 let previewUf = null, previewTimer = null, previewRequest = null, previewCloseTimer = null;
 const previewCache = new Map();
 const integer = new Intl.NumberFormat('pt-BR');
@@ -84,53 +89,56 @@ function render() {
   $('president-scope').addEventListener('change', e => {settings.president = e.target.value; resetQuery('1');});
   renderOverview();
   renderBench();
-  if(settings.page==='benches'&&settings.benchMode==='federal-br'&&Date.now()-nationalRequestedAt>=11000)loadNationalBench();
+  if(settings.page==='benches'&&nationalMode())loadNationalBench();
 }
 function updateMainView() {
   const benches=settings.page==='benches';
   $('results-panel').hidden=benches;$('benches-panel').hidden=!benches;
   $('results-tab').setAttribute('aria-selected',String(!benches));$('benches-tab').setAttribute('aria-selected',String(benches));
-  for(const mode of ['federal-br','state-ce','federal-ce'])$(mode+'-tab').setAttribute('aria-selected',String(settings.benchMode===mode));
+  for(const mode of ['federal-br','state-ce','federal-ce','senate-br'])$(mode+'-tab').setAttribute('aria-selected',String(settings.benchMode===mode));
   $('bench-section').setAttribute('aria-labelledby',settings.benchMode+'-tab');
   hideStatePreview();
-  if(benches){renderBench();if(settings.benchMode==='federal-br')loadNationalBench();}
+  if(benches){renderBench();if(nationalMode())loadNationalBench();}
   else updateOverviewView();
 }
 async function loadNationalBench(force=false) {
-  if(nationalBusy||settings.page!=='benches'||settings.benchMode!=='federal-br'||!force&&nationalBench&&Date.now()-nationalRequestedAt<11000)return;
-  nationalBusy=true;nationalRequestedAt=Date.now();nationalError='';
+  const cargo=settings.benchMode==='senate-br' ? '5' : '6',query=nationalQuery(cargo);
+  if(query.busy||settings.page!=='benches'||!nationalMode()||!force&&Date.now()-query.requestedAt<11000)return;
+  query.busy=true;query.requestedAt=Date.now();query.error='';
   const request=new AbortController(),turn=settings.turn,requestEpoch=epoch;
-  nationalController=request;
+  query.controller=request;
   const timeout=setTimeout(()=>request.abort(),75000);
   renderBench();
   try {
     let data;
-    if(directTSE)data=await TSEClient.benches(turn,request.signal);
+    if(directTSE)data=await TSEClient.benches(turn,request.signal,cargo);
     else {
-      const response=await fetch(`/api/benches?turn=${turn}`,{signal:request.signal,cache:'no-store'});
+      const response=await fetch(`/api/benches?turn=${turn}&cargo=${cargo}`,{signal:request.signal,cache:'no-store'});
       data=await response.json();
       if(!response.ok)throw new Error(data.error || 'Não foi possível consultar as UFs.');
     }
     if(requestEpoch!==epoch)return;
     if(data.error)throw new Error(data.error);
-    nationalBench=data;
+    query.data=data;
   } catch(error) {
-    if(requestEpoch===epoch)nationalError=error.name==='AbortError' ? 'A consulta nacional demorou demais. Tente atualizar novamente.' : error.message;
+    if(requestEpoch===epoch)query.error=error.name==='AbortError' ? 'A consulta nacional demorou demais. Tente atualizar novamente.' : error.message;
   } finally {
     clearTimeout(timeout);
-    if(nationalController===request){nationalBusy=false;nationalController=null;}
+    if(query.controller===request){query.busy=false;query.controller=null;}
     if(requestEpoch===epoch)renderBench();
   }
 }
 function renderBench() {
   if(settings.page!=='benches')return;
-  const national=settings.benchMode==='federal-br',cargo=settings.benchMode==='state-ce' ? '7' : '6';
-  const race=races[cargo],states=nationalBench?.states || [], model=national ? Bancada.national(states) : Bancada.simulate(race);
-  $('bench-title').textContent=national ? 'Câmara Federal · Brasil' : cargo==='7' ? 'Assembleia Legislativa · Ceará' : 'Bancada federal · Ceará';
+  const senate=settings.benchMode==='senate-br',national=nationalMode(),cargo=senate ? '5' : settings.benchMode==='state-ce' ? '7' : '6';
+  const query=nationalQuery(cargo),nationalBench=query.data;
+  const race=races[cargo],states=nationalBench?.states || [], model=senate ? Bancada.senate(states) : national ? Bancada.national(states) : Bancada.simulate(race);
+  $('bench-title').textContent=senate ? 'Senado · Brasil' : national ? 'Câmara Federal · Brasil' : cargo==='7' ? 'Assembleia Legislativa · Ceará' : 'Bancada federal · Ceará';
+  $('bench-note').textContent=senate ? 'Simulação dos dois primeiros por UF para as 54 vagas em disputa. Empates e critérios de elegibilidade não são resolvidos; não é uma lista oficial de eleitos. As 27 cadeiras em continuidade aparecem em cinza escuro, sem composição partidária representada. A legenda por partido considera apenas as vagas em disputa.' : 'Simulação por votação nominal dentro das vagas do partido ou federação informadas pelo TSE em cada UF. Não aplica critérios individuais de elegibilidade nem desempates; não é uma lista oficial de eleitos.';
   $('bench-svg').setAttribute('aria-label',$('bench-title').textContent);
   $('bench-svg').classList.toggle('bench-dense',national);
   const scrollTop=$('bench-detail').querySelector('.bench-candidates')?.scrollTop || 0;
-  const warning=national ? nationalError || (nationalBench?.errors.length ? `UFs sem atualização: ${nationalBench.errors.join(', ')}. Últimos dados recebidos mantidos; vagas sem dados aparecem em cinza.` : '') : errors[cargo];
+  const warning=national ? query.error || (nationalBench?.errors.length ? `UFs sem atualização: ${nationalBench.errors.join(', ')}. Últimos dados recebidos mantidos; vagas sem dados aparecem em cinza.` : '') : errors[cargo];
   $('bench-warning').hidden=!warning;
   $('bench-warning').textContent=warning || '';
   if(!model) {
@@ -142,9 +150,9 @@ function renderBench() {
   if(benchCandidate&&!model.seats.some(seat=>seat.candidate?.key===benchCandidate))benchCandidate=null;
   if(national) {
     const sections=states.reduce((sum,state)=>sum+state.sections,0),total=states.reduce((sum,state)=>sum+state.totalSections,0);
-    $('bench-status').textContent=`${nationalBusy ? 'Consultando as UFs…' : 'Simulação parcial'} · ${states.length}/27 UFs · ${decimal.format(total ? 100*sections/total : 0)}% nas UFs recebidas${nationalBench?.checkedAt ? ` · Consulta: ${new Date(nationalBench.checkedAt).toLocaleTimeString('pt-BR')}` : ''}`;
+    $('bench-status').textContent=`${query.busy ? 'Consultando as UFs…' : 'Simulação parcial'} · ${states.length}/27 UFs · ${decimal.format(total ? 100*sections/total : 0)}% nas UFs recebidas${nationalBench?.checkedAt ? ` · Consulta: ${new Date(nationalBench.checkedAt).toLocaleTimeString('pt-BR')}` : ''}`;
   } else $('bench-status').textContent=`${race.finished ? 'Simulação com a totalização do TSE' : 'Simulação parcial'} · ${decimal.format(race.sectionPercent)}% apurado`;
-  $('bench-count').textContent=`${model.total} cadeiras`;
+  $('bench-count').textContent=senate ? '54 em disputa · 27 em continuidade' : `${model.total} cadeiras`;
   $('bench-svg').innerHTML=model.seats.map(seat=>{
     const candidate=seat.candidate,selected=candidate?.key===benchCandidate;
     const label=candidate ? `${candidate.name} · ${candidate.party} · ${candidate.uf} · ${integer.format(candidate.votes)} votos${candidate.elected ? ' · Eleito pelo TSE' : ' · Simulação'}${seat.tied ? ' · Empate na votação' : ''}` : seat.group;
@@ -297,7 +305,7 @@ function paintStatePreview(data) {
 }
 function resetQuery(id) {
   save(); epoch++; controller?.abort(); busy = false;
-  if (id) {delete races[id]; delete errors[id];} else {hideStatePreview();previewCache.clear();nationalController?.abort();nationalController=null;nationalBusy=false;nationalBench=null;nationalError='';nationalRequestedAt=0;benchParty=null;benchCandidate=null;races = {}; errors = {}; overview = null; overviewError = ''; consulted = null; $('checked').textContent = '';}
+  if (id) {delete races[id]; delete errors[id];} else {hideStatePreview();previewCache.clear();for(const query of nationalQueries.values())query.controller?.abort();nationalQueries.clear();benchParty=null;benchCandidate=null;races = {}; errors = {}; overview = null; overviewError = ''; consulted = null; $('checked').textContent = '';}
   render(); refresh();
 }
 async function refresh() {
@@ -362,7 +370,7 @@ function renderChoices() {
   $('choices').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {if (input.checked) draftPins.add(input.value); else draftPins.delete(input.value);}));
 }
 $('auto').checked = settings.auto; $('turn').value = settings.turn;
-$('refresh').addEventListener('click',()=>{refresh();if(settings.page==='benches'&&settings.benchMode==='federal-br')loadNationalBench(true);});
+$('refresh').addEventListener('click',()=>{refresh();if(settings.page==='benches'&&nationalMode())loadNationalBench(true);});
 $('auto').addEventListener('change', () => {settings.auto = $('auto').checked; due = Date.now() + 11000; save(); tick();});
 $('turn').addEventListener('change', () => {settings.turn = $('turn').value; resetQuery();});
 $('search').addEventListener('input', renderChoices);
@@ -373,7 +381,7 @@ $('map-tab').addEventListener('click',()=>{settings.view='map';save();updateOver
 $('map-color').addEventListener('change',event=>{settings.mapColor=event.target.value;save();if(mapGeometry&&overview)drawMap();});
 $('results-tab').addEventListener('click',()=>{settings.page='results';save();updateMainView();});
 $('benches-tab').addEventListener('click',()=>{settings.page='benches';save();updateMainView();});
-for(const mode of ['federal-br','state-ce','federal-ce'])$(mode+'-tab').addEventListener('click',()=>{settings.benchMode=mode;benchParty=null;benchCandidate=null;save();updateMainView();});
+for(const mode of ['federal-br','state-ce','federal-ce','senate-br'])$(mode+'-tab').addEventListener('click',()=>{settings.benchMode=mode;benchParty=null;benchCandidate=null;save();updateMainView();});
 $('close-preview').addEventListener('click',hideStatePreview);
 $('state-preview').addEventListener('pointerenter',()=>clearTimeout(previewCloseTimer));
 $('state-preview').addEventListener('pointerleave',event=>{if(event.pointerType!=='touch')schedulePreviewClose();});

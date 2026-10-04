@@ -69,6 +69,10 @@ arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
 Na aba superior Bancadas, Federal / Brasil simula as 513 cadeiras somando a
 distribuicao de vagas dentro de cada uma das 27 UFs. Estadual / Ceara mostra
 as 46 cadeiras estaduais. Federal / Ceara preserva a visualizacao anterior.
+Senado / Brasil simula os dois primeiros de cada UF para as 54 vagas de 2026,
+com cores por partido. As 27 cadeiras em continuidade aparecem separadas em
+cinza escuro, sem atribuir partidos: a legenda nao representa a composicao
+partidaria completa das 81 cadeiras. Empates sao sinalizados, nao resolvidos.
 As consultas nacionais sao carregadas sob demanda e limitadas a quatro em
 paralelo, com cache de 11 segundos. UFs indisponiveis ficam sinalizadas; a
 simulacao nao redistribui nacionalmente vagas a partir dos votos individuais.

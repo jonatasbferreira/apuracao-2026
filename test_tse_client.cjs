@@ -64,9 +64,9 @@ test('national API uses only the 27 UFs, four concurrent requests, cache and exp
     active++;maximum=Math.max(maximum,active);
     await new Promise(resolve=>setImmediate(resolve));
     active--;
-    if(url.includes('comum/config'))return {ok:true,json:async()=>({pl:[{c:'ele2026',e:[{cd:'6259',t:'1',abr:[{cp:[{cd:'6'}]}]}]}]})};
+    if(url.includes('comum/config'))return {ok:true,json:async()=>({pl:[{c:'ele2026',e:[{cd:'6259',t:'1',abr:[{cp:[{cd:'6'},{cd:'5'}]}]}]}]})};
     if(fail&&url.includes('/sp/'))throw new Error('offline');
-    return {ok:true,json:async()=>({s:{st:'1',ts:'2',pst:'50'},v:{},carg:[{cd:'6',nv:'8',agr:[]}]})};
+    return {ok:true,json:async()=>({s:{st:'1',ts:'2',pst:'50'},v:{},carg:[{cd:url.includes('-c0005-') ? '5' : '6',nv:'8',agr:[]}]})};
   };
   try {
     const first=await client.benches('1');
@@ -80,5 +80,10 @@ test('national API uses only the 27 UFs, four concurrent requests, cache and exp
     assert.equal(second.states.length,27);
     assert.deepEqual(second.errors,[]);
     assert.equal(paths.length-before,1);
+    const senate=await client.benches('1',undefined,'5');
+    assert.equal(senate.states.length,27);
+    assert.ok(senate.states.every(state=>state.id==='5'));
+    assert.equal(paths.filter(path=>path.includes('-c0005-')).length,27);
+    await assert.rejects(client.benches('1',undefined,'7'),/Cargo inválido/);
   } finally {global.fetch=original;}
 });

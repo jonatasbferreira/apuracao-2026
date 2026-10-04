@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minha apuração | Ceará 2026</title>
-  <link rel="stylesheet" href="./style.css?v=bancadas-gerais-1">
+  <link rel="stylesheet" href="./style.css?v=senado-1">
   <script src="./d3.min.js" defer></script>
   <script src="./geography.js" defer></script>
-  <script src="./tse-client.js?v=bancadas-gerais-1" defer></script>
-  <script src="./bancada.js?v=bancadas-gerais-1" defer></script>
-  <script src="./app.js?v=bancadas-gerais-1" defer></script>
+  <script src="./tse-client.js?v=senado-1" defer></script>
+  <script src="./bancada.js?v=senado-1" defer></script>
+  <script src="./app.js?v=senado-1" defer></script>
 </head>
 <body>
   <header>
@@ -41,12 +41,12 @@
     </section>
     </div>
     <div id="benches-panel" role="tabpanel" aria-labelledby="benches-tab" hidden>
-      <div class="bench-tabs view-tabs" role="tablist" aria-label="Abrangência da bancada"><button id="federal-br-tab" role="tab" aria-selected="true" aria-controls="bench-section">Federal · Brasil</button><button id="state-ce-tab" role="tab" aria-selected="false" aria-controls="bench-section">Estadual · Ceará</button><button id="federal-ce-tab" role="tab" aria-selected="false" aria-controls="bench-section">Federal · Ceará</button></div>
+      <div class="bench-tabs view-tabs" role="tablist" aria-label="Abrangência da bancada"><button id="federal-br-tab" role="tab" aria-selected="true" aria-controls="bench-section">Federal · Brasil</button><button id="state-ce-tab" role="tab" aria-selected="false" aria-controls="bench-section">Estadual · Ceará</button><button id="federal-ce-tab" role="tab" aria-selected="false" aria-controls="bench-section">Federal · Ceará</button><button id="senate-br-tab" role="tab" aria-selected="false" aria-controls="bench-section">Senado · Brasil</button></div>
       <section id="bench-section" class="bench-section" role="tabpanel" aria-labelledby="federal-br-tab">
         <div class="bench-head"><div><h2 id="bench-title">Câmara Federal · Brasil</h2><p id="bench-status">Simulação da distribuição de vagas</p></div><strong id="bench-count"></strong></div>
         <div id="bench-warning" class="alert" hidden></div>
         <div class="bench-layout"><div class="bench-chart"><svg id="bench-svg" viewBox="0 0 640 340" aria-label="Simulação de cadeiras da Câmara Federal"></svg><div id="bench-legend" aria-label="Legenda dos partidos"></div></div><div id="bench-detail" aria-live="polite"></div></div>
-        <p class="bench-note">Simulação por votação nominal dentro das vagas do partido ou federação informadas pelo TSE em cada UF. Não aplica critérios individuais de elegibilidade nem desempates; não é uma lista oficial de eleitos.</p>
+        <p id="bench-note" class="bench-note">Simulação por votação nominal dentro das vagas do partido ou federação informadas pelo TSE em cada UF. Não aplica critérios individuais de elegibilidade nem desempates; não é uma lista oficial de eleitos.</p>
       </section>
     </div>
     <footer><a href="https://resultados.tse.jus.br/oficial/app/index.html" target="_blank" rel="noopener noreferrer">Resultados oficiais do TSE ↗</a><span>Presidente: Brasil ou Ceará. Demais cargos: Ceará.</span></footer>
