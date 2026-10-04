@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minha apuração | Ceará 2026</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./d3.min.js" defer></script>
+  <script src="./geography.js" defer></script>
+  <script src="./tse-client.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="identity"><span class="mark" aria-hidden="true">CE</span><div><h1>Minha apuração</h1><p>Ceará <span aria-hidden="true">/</span> Eleições 2026</p></div></div>
+    <div class="controls">
+      <label class="turn">Turno <select id="turn"><option value="1">1º turno</option><option value="2">2º turno</option></select></label>
+      <label class="auto"><input type="checkbox" id="auto"> Atualizar a cada 11s</label>
+      <button id="refresh" class="primary"><span aria-hidden="true">↻</span> Atualizar agora</button>
+    </div>
+  </header>
+  <main>
+    <div class="statusbar" role="status" aria-live="polite"><span id="connection">Consultando o TSE...</span><span id="checked"></span><span id="countdown">Atualização automática desligada</span></div>
+    <div id="error" class="alert" role="alert" hidden></div>
+    <div class="dashboard" id="dashboard"></div>
+    <section class="overview" aria-labelledby="overview-title">
+      <div class="overview-head"><div><h2 id="overview-title">Apuração pelo Brasil</h2><p id="overview-scope">Presidente · Seções totalizadas</p></div><div id="overview-time" class="timestamps"></div></div>
+      <div id="overview-error" class="alert" role="status" hidden></div>
+      <div id="national"></div>
+      <div class="overview-toolbar">
+        <div class="view-tabs" role="tablist" aria-label="Visualização da apuração"><button id="region-tab" role="tab" aria-selected="true" aria-controls="region-view">Por região</button><button id="map-tab" role="tab" aria-selected="false" aria-controls="map-view">Mapa</button></div>
+        <span class="sort-caption">Estados: mais apurados primeiro</span>
+      </div>
+      <div id="region-view" role="tabpanel" aria-labelledby="region-tab"><div id="states" class="states"></div></div>
+      <div id="map-view" role="tabpanel" aria-labelledby="map-tab" hidden>
+        <div class="map-toolbar"><label>Cor do mapa <select id="map-color"><option value="progress">Apuração</option><option value="region">Regiões</option></select></label><div id="map-legend"></div></div>
+        <div class="map-layout"><div class="map-surface"><svg id="brazil-map" viewBox="0 0 660 620" aria-label="Mapa interativo dos estados do Brasil"></svg><div id="map-error" class="alert" hidden></div><p class="map-source"><a href="https://servicodados.ibge.gov.br/api/docs/malhas?versao=3" target="_blank" rel="noopener noreferrer">Malha geográfica: IBGE ↗</a></p></div><div id="map-regions"></div></div>
+      </div>
+    </section>
+    <footer><a href="https://resultados.tse.jus.br/oficial/app/index.html" target="_blank" rel="noopener noreferrer">Resultados oficiais do TSE ↗</a><span>Presidente: Brasil ou Ceará. Demais cargos: Ceará.</span></footer>
+  </main>
+  <div id="state-preview" class="state-preview" role="region" aria-label="Votação de presidente no estado" hidden><div class="preview-head"><h3 id="preview-title"></h3><button id="close-preview" class="icon" aria-label="Fechar votação do estado" title="Fechar">×</button></div><div id="preview-content" aria-live="polite"></div></div>
+  <dialog id="picker">
+    <div class="dialog-head"><h2 id="picker-title">Candidatos fixados</h2><button id="close-picker" class="icon" aria-label="Fechar" title="Fechar">×</button></div>
+    <label class="search-label" for="search">Buscar candidato</label><input id="search" type="search" placeholder="Nome ou número" autocomplete="off">
+    <div id="choices"></div>
+    <div class="dialog-footer"><button id="save-picker" class="primary">Salvar seleção</button></div>
+  </dialog>
+</body>
+</html>
