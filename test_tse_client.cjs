@@ -56,3 +56,29 @@ test('browser overview uses the national total and includes exterior',()=>{
   assert.equal(overview.national.percent,40);
   assert.deepEqual(overview.states.map(s=>s.uf),['CE','ZZ']);
 });
+test('national API uses only the 27 UFs, four concurrent requests, cache and explicit missing-UF warnings',async()=>{
+  const original=global.fetch,paths=[];
+  let active=0,maximum=0,fail=true;
+  global.fetch=async url=>{
+    paths.push(url);
+    active++;maximum=Math.max(maximum,active);
+    await new Promise(resolve=>setImmediate(resolve));
+    active--;
+    if(url.includes('comum/config'))return {ok:true,json:async()=>({pl:[{c:'ele2026',e:[{cd:'6259',t:'1',abr:[{cp:[{cd:'6'}]}]}]}]})};
+    if(fail&&url.includes('/sp/'))throw new Error('offline');
+    return {ok:true,json:async()=>({s:{st:'1',ts:'2',pst:'50'},v:{},carg:[{cd:'6',nv:'8',agr:[]}]})};
+  };
+  try {
+    const first=await client.benches('1');
+    assert.equal(first.states.length,26);
+    assert.deepEqual(first.errors,['SP']);
+    assert.ok(maximum<=4);
+    assert.equal(paths.filter(path=>path.includes('-c0006-')).length,27);
+    assert.ok(paths.every(path=>!path.includes('/dados/br/')&&!path.includes('/dados/zz/')));
+    const before=paths.length;fail=false;
+    const second=await client.benches('1');
+    assert.equal(second.states.length,27);
+    assert.deepEqual(second.errors,[]);
+    assert.equal(paths.length-before,1);
+  } finally {global.fetch=original;}
+});

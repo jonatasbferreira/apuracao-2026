@@ -3,7 +3,7 @@ const directTSE = !['127.0.0.1','localhost','::1'].includes(location.hostname);
 const titles = {'1':'Presidente', '3':'Governador', '5':'Senador', '6':'Deputado federal', '7':'Deputado estadual'};
 const colors = {'1':'#337e98', '3':'#21725b', '5':'#b18c32', '6':'#456d91', '7':'#8c5e78'};
 const defaults = {'1':[], '3':['45','13','14'], '5':['400','222','300','180','445'], '6':['2277'], '7':['22777']};
-let settings = {turn:'1', president:'br', auto:true, autoDefaultVersion:1, view:'regions', mapColor:'progress', pinsVersion:0, pins:structuredClone(defaults)};
+let settings = {turn:'1', president:'br', auto:true, autoDefaultVersion:1, page:'results', benchMode:'federal-br', view:'regions', mapColor:'progress', pinsVersion:0, pins:structuredClone(defaults)};
 try {
   const saved = JSON.parse(localStorage.getItem('apuracao-ce-v1'));
   if (saved) {
@@ -12,6 +12,8 @@ try {
     settings.auto = saved.autoDefaultVersion === 1 ? saved.auto !== false : true;
     settings.view = saved.view === 'map' ? 'map' : 'regions';
     settings.mapColor = saved.mapColor === 'region' ? 'region' : 'progress';
+    settings.page=saved.page==='benches' ? 'benches' : 'results';
+    settings.benchMode=['federal-br','state-ce','federal-ce'].includes(saved.benchMode) ? saved.benchMode : 'federal-br';
     settings.pinsVersion = Number(saved.pinsVersion) || 0;
     for (const id of Object.keys(defaults)) {
       if (Array.isArray(saved.pins?.[id])) settings.pins[id] = saved.pins[id].filter(n => /^\d+$/.test(n));
@@ -29,6 +31,7 @@ let controller = null, epoch = 0, consulted = null;
 let overview = null, overviewError = '';
 let mapGeometry = null, mapPromise = null, focusedRegion = null;
 let benchParty=null, benchCandidate=null;
+let nationalBench=null, nationalBusy=false, nationalController=null, nationalRequestedAt=0, nationalError='';
 let previewUf = null, previewTimer = null, previewRequest = null, previewCloseTimer = null;
 const previewCache = new Map();
 const integer = new Intl.NumberFormat('pt-BR');
@@ -81,32 +84,79 @@ function render() {
   $('president-scope').addEventListener('change', e => {settings.president = e.target.value; resetQuery('1');});
   renderOverview();
   renderBench();
+  if(settings.page==='benches'&&settings.benchMode==='federal-br'&&Date.now()-nationalRequestedAt>=11000)loadNationalBench();
+}
+function updateMainView() {
+  const benches=settings.page==='benches';
+  $('results-panel').hidden=benches;$('benches-panel').hidden=!benches;
+  $('results-tab').setAttribute('aria-selected',String(!benches));$('benches-tab').setAttribute('aria-selected',String(benches));
+  for(const mode of ['federal-br','state-ce','federal-ce'])$(mode+'-tab').setAttribute('aria-selected',String(settings.benchMode===mode));
+  $('bench-section').setAttribute('aria-labelledby',settings.benchMode+'-tab');
+  hideStatePreview();
+  if(benches){renderBench();if(settings.benchMode==='federal-br')loadNationalBench();}
+  else updateOverviewView();
+}
+async function loadNationalBench(force=false) {
+  if(nationalBusy||settings.page!=='benches'||settings.benchMode!=='federal-br'||!force&&nationalBench&&Date.now()-nationalRequestedAt<11000)return;
+  nationalBusy=true;nationalRequestedAt=Date.now();nationalError='';
+  const request=new AbortController(),turn=settings.turn,requestEpoch=epoch;
+  nationalController=request;
+  const timeout=setTimeout(()=>request.abort(),75000);
+  renderBench();
+  try {
+    let data;
+    if(directTSE)data=await TSEClient.benches(turn,request.signal);
+    else {
+      const response=await fetch(`/api/benches?turn=${turn}`,{signal:request.signal,cache:'no-store'});
+      data=await response.json();
+      if(!response.ok)throw new Error(data.error || 'Não foi possível consultar as UFs.');
+    }
+    if(requestEpoch!==epoch)return;
+    if(data.error)throw new Error(data.error);
+    nationalBench=data;
+  } catch(error) {
+    if(requestEpoch===epoch)nationalError=error.name==='AbortError' ? 'A consulta nacional demorou demais. Tente atualizar novamente.' : error.message;
+  } finally {
+    clearTimeout(timeout);
+    if(nationalController===request){nationalBusy=false;nationalController=null;}
+    if(requestEpoch===epoch)renderBench();
+  }
 }
 function renderBench() {
-  const race=races['6'], model=Bancada.simulate(race);
+  if(settings.page!=='benches')return;
+  const national=settings.benchMode==='federal-br',cargo=settings.benchMode==='state-ce' ? '7' : '6';
+  const race=races[cargo],states=nationalBench?.states || [], model=national ? Bancada.national(states) : Bancada.simulate(race);
+  $('bench-title').textContent=national ? 'Câmara Federal · Brasil' : cargo==='7' ? 'Assembleia Legislativa · Ceará' : 'Bancada federal · Ceará';
+  $('bench-svg').setAttribute('aria-label',$('bench-title').textContent);
+  $('bench-svg').classList.toggle('bench-dense',national);
   const scrollTop=$('bench-detail').querySelector('.bench-candidates')?.scrollTop || 0;
-  $('bench-warning').hidden=!errors['6'];
-  $('bench-warning').textContent=errors['6'] ? 'Dados federais indisponíveis. A simulação usa a última consulta recebida.' : '';
+  const warning=national ? nationalError || (nationalBench?.errors.length ? `UFs sem atualização: ${nationalBench.errors.join(', ')}. Últimos dados recebidos mantidos; vagas sem dados aparecem em cinza.` : '') : errors[cargo];
+  $('bench-warning').hidden=!warning;
+  $('bench-warning').textContent=warning || '';
   if(!model) {
     $('bench-status').textContent='Simulação da distribuição de vagas';
     $('bench-svg').innerHTML='';$('bench-legend').innerHTML='';$('bench-count').textContent='';
     $('bench-detail').innerHTML='<p class="empty">Aguardando distribuição de vagas do TSE.</p>';return;
   }
   if(benchParty!==null&&!model.legend.some(item=>item.party===benchParty))benchParty=null;
-  if(benchCandidate&&!model.seats.some(seat=>seat.candidate?.number===benchCandidate))benchCandidate=null;
-  $('bench-status').textContent=`${race.finished ? 'Simulação com a totalização do TSE' : 'Simulação parcial'} · ${decimal.format(race.sectionPercent)}% apurado`;
+  if(benchCandidate&&!model.seats.some(seat=>seat.candidate?.key===benchCandidate))benchCandidate=null;
+  if(national) {
+    const sections=states.reduce((sum,state)=>sum+state.sections,0),total=states.reduce((sum,state)=>sum+state.totalSections,0);
+    $('bench-status').textContent=`${nationalBusy ? 'Consultando as UFs…' : 'Simulação parcial'} · ${states.length}/27 UFs · ${decimal.format(total ? 100*sections/total : 0)}% nas UFs recebidas${nationalBench?.checkedAt ? ` · Consulta: ${new Date(nationalBench.checkedAt).toLocaleTimeString('pt-BR')}` : ''}`;
+  } else $('bench-status').textContent=`${race.finished ? 'Simulação com a totalização do TSE' : 'Simulação parcial'} · ${decimal.format(race.sectionPercent)}% apurado`;
   $('bench-count').textContent=`${model.total} cadeiras`;
   $('bench-svg').innerHTML=model.seats.map(seat=>{
-    const candidate=seat.candidate,selected=candidate?.number===benchCandidate;
-    const label=candidate ? `${candidate.name} · ${candidate.party} · ${integer.format(candidate.votes)} votos${candidate.elected ? ' · Eleito pelo TSE' : ' · Simulação'}${seat.tied ? ' · Empate na votação' : ''}` : seat.group;
-    return `<g class="bench-seat ${selected?'selected':''}" data-seat="${seat.index}" tabindex="0" role="button" aria-label="${esc(label)}" opacity="${benchParty!==null&&seat.party!==benchParty ? '.18' : '1'}"><title>${esc(label)}</title><circle cx="${seat.x}" cy="${seat.y}" r="21" fill="${seat.party ? Bancada.color(seat.party) : '#ccd4d0'}"/><text x="${seat.x}" y="${seat.y+4}" text-anchor="middle">${esc(candidate?.number || '—')}</text>${candidate&&settings.pins['6'].includes(candidate.number) ? `<circle class="bench-pin" cx="${seat.x+15}" cy="${seat.y-15}" r="5"/>` : ''}</g>`;
+    const candidate=seat.candidate,selected=candidate?.key===benchCandidate;
+    const label=candidate ? `${candidate.name} · ${candidate.party} · ${candidate.uf} · ${integer.format(candidate.votes)} votos${candidate.elected ? ' · Eleito pelo TSE' : ' · Simulação'}${seat.tied ? ' · Empate na votação' : ''}` : seat.group;
+    const pinned=candidate&&candidate.uf==='CE'&&settings.pins[cargo].includes(candidate.number);
+    return `<g class="bench-seat ${selected?'selected':''}" data-seat="${seat.index}" tabindex="0" role="button" aria-label="${esc(label)}" opacity="${benchParty!==null&&seat.party!==benchParty ? '.18' : '1'}"><title>${esc(label)}</title><circle cx="${seat.x}" cy="${seat.y}" r="${model.radius}" fill="${seat.party ? Bancada.color(seat.party) : '#ccd4d0'}"/>${!national ? `<text x="${seat.x}" y="${seat.y+4}" text-anchor="middle">${esc(candidate?.number || '—')}</text>` : ''}${pinned ? `<circle class="bench-pin" cx="${seat.x+model.radius*.7}" cy="${seat.y-model.radius*.7}" r="${Math.min(5,model.radius*.35)}"/>` : ''}</g>`;
   }).join('');
   $('bench-legend').innerHTML=model.legend.map(item=>`<button class="bench-party ${benchParty===item.party?'active':''}" data-party="${esc(item.party)}" aria-pressed="${benchParty===item.party}"><i style="background:${item.color}"></i><span>${esc(item.label)}</span><strong>${item.seats}</strong></button>`).join('');
   const visible=model.seats.filter(seat=>seat.candidate&&(benchParty===null||seat.party===benchParty));
-  const chosen=visible.find(seat=>seat.candidate.number===benchCandidate);
-  $('bench-detail').innerHTML=`<div class="bench-detail-head"><h3>${esc(benchParty===null ? 'Candidatos na simulação' : benchParty || 'A definir')}</h3><span>${benchParty===null ? model.defined : model.legend.find(item=>item.party===benchParty).seats} cadeiras</span></div>${chosen ? `<div class="bench-selection"><strong>${esc(chosen.candidate.name)}</strong><span>${esc(chosen.candidate.number)} · ${esc(chosen.candidate.party)} · ${integer.format(chosen.candidate.votes)} votos</span><small>${chosen.candidate.elected ? 'Eleito indicado pelo TSE' : chosen.tied ? 'Votação empatada no limite das vagas' : 'Presença estimada pela votação nominal'}</small></div>` : ''}<div class="bench-candidates">${visible.map(seat=>`<button data-candidate="${esc(seat.candidate.number)}" class="bench-person ${benchCandidate===seat.candidate.number?'active':''}"><i style="background:${Bancada.color(seat.party)}"></i><span><strong>${esc(seat.candidate.name)}</strong><small>${esc(seat.party)} · ${integer.format(seat.candidate.votes)} votos${seat.candidate.elected?' · Eleito TSE':''}${seat.tied?' · Empate':''}</small></span>${settings.pins['6'].includes(seat.candidate.number)?'<small class="pin">Fixado</small>':''}</button>`).join('') || '<p class="empty">Aguardando candidatos para essas vagas.</p>'}</div>`;
+  const chosen=visible.find(seat=>seat.candidate.key===benchCandidate);
+  $('bench-detail').innerHTML=`<div class="bench-detail-head"><h3>${esc(benchParty===null ? 'Candidatos na simulação' : benchParty || 'A definir')}</h3><span>${benchParty===null ? model.defined : model.legend.find(item=>item.party===benchParty).seats} cadeiras</span></div>${chosen ? `<div class="bench-selection"><strong>${esc(chosen.candidate.name)}</strong><span>${esc(chosen.candidate.number)} · ${esc(chosen.candidate.party)} · ${esc(chosen.candidate.uf)} · ${integer.format(chosen.candidate.votes)} votos</span><small>${chosen.candidate.elected ? 'Eleito indicado pelo TSE' : chosen.tied ? 'Votação empatada no limite das vagas' : 'Presença estimada pela votação nominal'}</small></div>` : ''}<div class="bench-candidates">${visible.map(seat=>`<button data-candidate="${esc(seat.candidate.key)}" class="bench-person ${benchCandidate===seat.candidate.key?'active':''}"><i style="background:${Bancada.color(seat.party)}"></i><span><strong>${esc(seat.candidate.name)}</strong><small>${esc(seat.party)} · ${esc(seat.candidate.uf)} · ${integer.format(seat.candidate.votes)} votos${seat.candidate.elected?' · Eleito TSE':''}${seat.tied?' · Empate':''}</small></span>${seat.candidate.uf==='CE'&&settings.pins[cargo].includes(seat.candidate.number)?'<small class="pin">Fixado</small>':''}</button>`).join('') || '<p class="empty">Aguardando candidatos para essas vagas.</p>'}</div>`;
   $('bench-legend').querySelectorAll('[data-party]').forEach(button=>button.addEventListener('click',()=>{benchParty=benchParty===button.dataset.party?null:button.dataset.party;benchCandidate=null;renderBench();}));
-  const selectSeat=seat=>{benchCandidate=seat.candidate?.number || null;benchParty=seat.party;renderBench();};
+  const selectSeat=seat=>{benchCandidate=seat.candidate?.key || null;benchParty=seat.party;renderBench();};
   $('bench-svg').querySelectorAll('[data-seat]').forEach(element=>{
     element.addEventListener('click',()=>selectSeat(model.seats[Number(element.dataset.seat)]));
     element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectSeat(model.seats[Number(element.dataset.seat)]);}});
@@ -136,7 +186,7 @@ function updateOverviewView() {
   $('region-view').hidden = map; $('map-view').hidden = !map;
   $('region-tab').setAttribute('aria-selected',String(!map)); $('map-tab').setAttribute('aria-selected',String(map));
   $('map-color').value = settings.mapColor;
-  if (map && overview) ensureMap();
+  if (map && overview && settings.page==='results') ensureMap();
 }
 async function ensureMap() {
   if (mapGeometry) {drawMap(); return;}
@@ -247,7 +297,7 @@ function paintStatePreview(data) {
 }
 function resetQuery(id) {
   save(); epoch++; controller?.abort(); busy = false;
-  if (id) {delete races[id]; delete errors[id];} else {hideStatePreview();previewCache.clear();races = {}; errors = {}; overview = null; overviewError = ''; consulted = null; $('checked').textContent = '';}
+  if (id) {delete races[id]; delete errors[id];} else {hideStatePreview();previewCache.clear();nationalController?.abort();nationalController=null;nationalBusy=false;nationalBench=null;nationalError='';nationalRequestedAt=0;benchParty=null;benchCandidate=null;races = {}; errors = {}; overview = null; overviewError = ''; consulted = null; $('checked').textContent = '';}
   render(); refresh();
 }
 async function refresh() {
@@ -312,7 +362,7 @@ function renderChoices() {
   $('choices').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {if (input.checked) draftPins.add(input.value); else draftPins.delete(input.value);}));
 }
 $('auto').checked = settings.auto; $('turn').value = settings.turn;
-$('refresh').addEventListener('click', refresh);
+$('refresh').addEventListener('click',()=>{refresh();if(settings.page==='benches'&&settings.benchMode==='federal-br')loadNationalBench(true);});
 $('auto').addEventListener('change', () => {settings.auto = $('auto').checked; due = Date.now() + 11000; save(); tick();});
 $('turn').addEventListener('change', () => {settings.turn = $('turn').value; resetQuery();});
 $('search').addEventListener('input', renderChoices);
@@ -321,13 +371,16 @@ $('save-picker').addEventListener('click', () => {settings.pins[pickerId] = [...
 $('region-tab').addEventListener('click',()=>{settings.view='regions';save();updateOverviewView();});
 $('map-tab').addEventListener('click',()=>{settings.view='map';save();updateOverviewView();});
 $('map-color').addEventListener('change',event=>{settings.mapColor=event.target.value;save();if(mapGeometry&&overview)drawMap();});
+$('results-tab').addEventListener('click',()=>{settings.page='results';save();updateMainView();});
+$('benches-tab').addEventListener('click',()=>{settings.page='benches';save();updateMainView();});
+for(const mode of ['federal-br','state-ce','federal-ce'])$(mode+'-tab').addEventListener('click',()=>{settings.benchMode=mode;benchParty=null;benchCandidate=null;save();updateMainView();});
 $('close-preview').addEventListener('click',hideStatePreview);
 $('state-preview').addEventListener('pointerenter',()=>clearTimeout(previewCloseTimer));
 $('state-preview').addEventListener('pointerleave',event=>{if(event.pointerType!=='touch')schedulePreviewClose();});
 $('state-preview').addEventListener('focusin',()=>clearTimeout(previewCloseTimer));
 $('state-preview').addEventListener('focusout',event=>{if(!$('state-preview').contains(event.relatedTarget))schedulePreviewClose();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')hideStatePreview();});
-updateOverviewView();
+updateMainView();
 function tick() {
   $('countdown').textContent = !settings.auto ? 'Atualização automática desligada' : busy ? 'Atualizando...' : `Próxima consulta em ${Math.max(0,Math.ceil((due-Date.now())/1000))}s`;
   if (settings.auto && !busy && Date.now() >= due) refresh();

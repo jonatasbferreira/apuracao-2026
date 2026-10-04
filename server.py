@@ -219,10 +219,48 @@ def get_results(turn, presidential_uf):
     return {"checkedAt": datetime.now(timezone.utc).isoformat(), "turn": turn, "races": results, "overview": overview}
 
 
+def get_benches(turn):
+    elections = get_elections(turn)
+    match = next(((cycle, election) for cycle, election in elections
+                  if any(str(c["cd"]) == "6" for a in election.get("abr", []) for c in a.get("cp", []))), None)
+    if not match:
+        return {"error": "Deputado federal ainda nao foi publicado para este turno."}
+    cycle, election = match
+    code = str(election["cd"])
+
+    def load(uf):
+        path = f"{cycle}/{code}/dados/{uf}/{uf}-c0006-e{code.zfill(6)}-u.json"
+        try:
+            return uf, normalize(fetch_json(path, ttl=11), "6", cycle, code, uf, path), False
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError) as error:
+            if isinstance(error, HTTPError):
+                error.close()
+            with cache_lock:
+                saved = cache.get(path)
+            if saved:
+                return uf, normalize(saved[1], "6", cycle, code, uf, path), True
+            return uf, None, True
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        entries = list(pool.map(load, sorted(uf for uf in STATE_NAMES if uf not in ("br", "zz"))))
+    return {"turn": turn, "states": [result for _, result, _ in entries if result],
+            "errors": [uf.upper() for uf, _, error in entries if error],
+            "checkedAt": datetime.now(timezone.utc).isoformat()}
+
+
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urlsplit(self.path)
-        if url.path == "/api/state":
+        if url.path == "/api/benches":
+            turn = parse_qs(url.query).get("turn", ["1"])[0]
+            if turn not in ("1", "2"):
+                self.send_json({"error": "Parametros invalidos."}, 400)
+                return
+            try:
+                self.send_json(get_benches(turn))
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
+                self.send_json({"error": "Nao foi possivel consultar a bancada nacional."}, 502)
+        elif url.path == "/api/state":
             params = parse_qs(url.query)
             turn = params.get("turn", ["1"])[0]
             uf = params.get("uf", [""])[0].lower()

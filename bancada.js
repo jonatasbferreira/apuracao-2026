@@ -15,23 +15,44 @@
       for(let index=0;index<count && seats.length<race.totalSeats;index++) {
         const candidate=members[index];
         const tied=candidate && !candidate.elected && members[count]?.votes===candidate.votes;
-        seats.push({candidate:candidate?.votes>0 ? candidate : null,party:candidate?.votes>0 ? candidate.party : '',group:group.label,tied:Boolean(tied)});
+        seats.push({candidate:candidate?.votes>0 ? {...candidate,uf:race.uf || 'CE',key:`${race.uf || 'CE'}:${candidate.number}`,cargo:race.id || '6'} : null,party:candidate?.votes>0 ? candidate.party : '',group:group.label,tied:Boolean(tied)});
       }
     }
     while(seats.length<race.totalSeats)seats.push({candidate:null,party:'',group:'Aguardando distribuição',tied:false});
+    return compose(seats,race.totalSeats);
+  }
+  function compose(seats,total) {
     seats.sort((a,b)=>a.party.localeCompare(b.party)||a.group.localeCompare(b.group)||(b.candidate?.votes || 0)-(a.candidate?.votes || 0));
     const legend=new Map();
     for(const seat of seats) {
       if(!legend.has(seat.party))legend.set(seat.party,{party:seat.party,label:seat.party || 'A definir',color:seat.party ? color(seat.party) : '#ccd4d0',seats:0,elected:0});
       const item=legend.get(seat.party);item.seats++;item.elected+=Number(Boolean(seat.candidate?.elected));
     }
-    const rows=[Math.round(race.totalSeats*.2),Math.round(race.totalSeats*.32)];rows.push(race.totalSeats-rows[0]-rows[1]);
+    let rows,radii;
+    if(total<=24) {
+      rows=[Math.round(total*.2),Math.round(total*.32)];rows.push(total-rows[0]-rows[1]);
+      radii=[130,194,258];
+    } else {
+      const rowCount=Math.ceil(Math.sqrt(total/5));
+      radii=Array.from({length:rowCount},(_,i)=>100+158*i/(rowCount-1));
+      const sum=radii.reduce((a,b)=>a+b,0), targets=radii.map(radius=>total*radius/sum);
+      rows=targets.map(Math.floor);
+      const remainder=targets.map((value,index)=>({index,fraction:value-rows[index]})).sort((a,b)=>b.fraction-a.fraction);
+      for(let i=0,left=total-rows.reduce((a,b)=>a+b,0);i<left;i++)rows[remainder[i].index]++;
+    }
     const positions=rows.flatMap((count,row)=>Array.from({length:count},(_,index)=>{
-      const angle=count===1 ? Math.PI/2 : Math.PI*index/(count-1), radius=130+row*64;
+      const angle=count===1 ? Math.PI/2 : Math.PI*index/(count-1), radius=radii[row];
       return {angle,radius,x:320-radius*Math.cos(angle),y:290-radius*Math.sin(angle)};
     })).sort((a,b)=>a.angle-b.angle||a.radius-b.radius);
-    return {seats:seats.map((seat,index)=>({...seat,...positions[index],index})),legend:[...legend.values()].sort((a,b)=>b.seats-a.seats||a.label.localeCompare(b.label)),total:race.totalSeats,defined:seats.filter(s=>s.candidate).length};
+    const spacing=Math.min(...rows.map((count,index)=>count>1 ? 2*radii[index]*Math.sin(Math.PI/(2*(count-1))) : Infinity),...radii.slice(1).map((r,index)=>r-radii[index]));
+    return {seats:seats.map((seat,index)=>({...seat,...positions[index],index})),legend:[...legend.values()].sort((a,b)=>b.seats-a.seats||a.label.localeCompare(b.label)),total,radius:Math.min(21,spacing*.4),defined:seats.filter(s=>s.candidate).length};
   }
-  const api={color,simulate};
+  function national(states) {
+    // Federal seats are allocated within each UF, never by a national vote ranking.
+    const seats=states.flatMap(state=>simulate(state)?.seats || []).slice(0,513);
+    while(seats.length<513)seats.push({candidate:null,party:'',group:'UF com dados pendentes',tied:false});
+    return compose(seats,513);
+  }
+  const api={color,simulate,national};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Bancada=api;
 })(typeof window!=='undefined' ? window : globalThis);

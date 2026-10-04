@@ -66,6 +66,13 @@ O segundo turno pode ficar indisponivel ate o TSE publicar o catalogo e os
 arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
 # Versao online
 
+Na aba superior Bancadas, Federal / Brasil simula as 513 cadeiras somando a
+distribuicao de vagas dentro de cada uma das 27 UFs. Estadual / Ceara mostra
+as 46 cadeiras estaduais. Federal / Ceara preserva a visualizacao anterior.
+As consultas nacionais sao carregadas sob demanda e limitadas a quatro em
+paralelo, com cache de 11 segundos. UFs indisponiveis ficam sinalizadas; a
+simulacao nao redistribui nacionalmente vagas a partir dos votos individuais.
+
 A simulacao da bancada federal do Ceara usa as vagas parciais do TSE por partido
 ou federacao. Nas federacoes, considera os candidatos mais votados do conjunto
 para estimar cadeiras por partido. As cores sao convencoes visuais do painel.

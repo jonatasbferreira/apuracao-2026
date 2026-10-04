@@ -20,6 +20,25 @@ def fixture():
 
 
 class ResultsTests(unittest.TestCase):
+    def test_national_benches_use_27_state_files_and_preserve_partial_errors(self):
+        config = {"pl": [{"c": "ele2026", "e": [{"cd": "6259", "t": "1", "abr": [{"cp": [{"cd": "6"}]}]}]}]}
+        paths = []
+
+        def fetch(path, ttl=8):
+            paths.append(path)
+            if path == "comum/config/ele-c.json":
+                return config
+            if "/sp/" in path:
+                raise HTTPError("https://resultados.tse.jus.br/", 404, "Missing", {}, None)
+            return fixture()
+
+        with patch.object(server, "fetch_json", side_effect=fetch):
+            result = server.get_benches("1")
+        self.assertEqual(len(result["states"]), 26)
+        self.assertEqual(result["errors"], ["SP"])
+        self.assertEqual(len([path for path in paths if "-c0006-" in path]), 27)
+        self.assertFalse(any("/dados/br/" in path or "/dados/zz/" in path for path in paths))
+
     def test_group_seats_are_partial_and_official_elected_count_is_separate(self):
         data = fixture()
         data["carg"][0]["nv"] = "24"

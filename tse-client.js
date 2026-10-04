@@ -5,6 +5,7 @@
   const number = value => Number(String(value || 0).replace(',','.'));
   const generated = data => `${data.dg || ''} ${data.hg || ''}`.trim();
   let catalog = null, catalogAt = 0;
+  const federalCache = new Map();
 
   async function read(path, signal) {
     const controller = new AbortController();
@@ -85,7 +86,9 @@
       try {
         const entry = match(entries,cargo), uf = cargo==='1' ? president : 'ce';
         const path = resultPath(entry,cargo,uf);
-        return normalize(await read(path,signal),cargo,entry,uf,path);
+        const result=normalize(await read(path,signal),cargo,entry,uf,path);
+        if(cargo==='6')federalCache.set(turn+':'+uf,{result,time:Date.now()});
+        return result;
       } catch(error) {return {id:cargo,error:error.message};}
     }));
     const overviewPromise = (async()=>{
@@ -105,7 +108,32 @@
     const leaders = result.candidates.some(c=>c.votes>0) ? result.candidates.slice(0,3).map(({number,name,party,votes,percent})=>({number,name,party,votes,percent})) : [];
     return {uf:uf.toUpperCase(),name:names[uf.toUpperCase()],turn,sectionPercent:result.sectionPercent,generated:result.generated,source:result.source,checkedAt:new Date().toISOString(),leaders};
   }
-  const api = {results,state,normalize,tracking};
+  async function benches(turn,signal) {
+    const entry=match(await elections(turn,signal),'6');
+    const ufs=Object.keys(names).filter(uf=>!['BR','ZZ'].includes(uf)).map(uf=>uf.toLowerCase());
+    const states=[],errors=[];
+    let cursor=0;
+    await Promise.all(Array.from({length:4},async()=>{
+      while(cursor<ufs.length&&!signal?.aborted) {
+        const uf=ufs[cursor++],key=turn+':'+uf,cached=federalCache.get(key);
+        try {
+          let result=cached&&Date.now()-cached.time<11000 ? cached.result : null;
+          if(!result) {
+            const path=resultPath(entry,'6',uf);
+            result=normalize(await read(path,signal),'6',entry,uf,path);
+            federalCache.set(key,{result,time:Date.now()});
+          }
+          states.push(result);
+        } catch(error) {
+          errors.push(uf.toUpperCase());
+          if(cached)states.push(cached.result);
+        }
+      }
+    }));
+    if(signal?.aborted)throw new DOMException('Consulta cancelada.','AbortError');
+    return {turn,states:states.sort((a,b)=>a.uf.localeCompare(b.uf)),errors,checkedAt:new Date().toISOString()};
+  }
+  const api = {results,state,benches,normalize,tracking};
   if (typeof module!=='undefined' && module.exports) module.exports=api;
   else root.TSEClient=api;
 })(typeof window!=='undefined' ? window : globalThis);

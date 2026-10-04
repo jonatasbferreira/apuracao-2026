@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {simulate,color}=require('./bancada.js');
+const {simulate,color,national}=require('./bancada.js');
 const candidate=(number,party,votes,elected=false)=>({number,name:'Pessoa '+number,party,votes,elected});
 test('federation seats are allocated jointly then colored by the selected candidates parties',()=>{
   const model=simulate({totalSeats:5,seatGroups:[{label:'PT / PV',parties:['PT','PV'],seats:3},{label:'PL',parties:['PL'],seats:2}],candidates:[
@@ -33,5 +33,27 @@ test('22-seat geometry has sufficient spacing for desktop and mobile circles',()
   for(const a of seats) {
     assert.ok(a.x>=21&&a.x<=619&&a.y>=21&&a.y<=319);
     for(const b of seats)if(a.index!==b.index)assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>44);
+  }
+});
+test('national simulation allocates seats in each UF and distinguishes repeated candidate numbers',()=>{
+  const state=(uf,votes,party,seats)=>({id:'6',uf,totalSeats:2,seatGroups:[{label:party,parties:[party],seats}],candidates:[candidate('2201',party,votes),candidate('2202',party,votes-1)]});
+  const model=national([state('CE',100,'PL',1),state('SP',1000000,'PL',2)]);
+  assert.equal(model.total,513);
+  assert.equal(model.seats.length,513);
+  assert.equal(model.defined,3);
+  assert.equal(model.legend.find(item=>item.party==='PL').seats,3);
+  assert.equal(model.legend.find(item=>item.party==='').seats,510);
+  assert.deepEqual(model.seats.filter(s=>s.candidate).map(s=>s.candidate.key).sort(),['CE:2201','SP:2201','SP:2202']);
+  assert.equal(model.seats.filter(s=>s.candidate?.uf==='CE').length,1);
+});
+test('46-seat and 513-seat layouts contain exactly that many nonoverlapping circles',()=>{
+  for(const total of [46,513]) {
+    const model=simulate({totalSeats:total,seatGroups:[],candidates:[]});
+    assert.equal(model.seats.length,total);
+    assert.ok(model.radius>3);
+    for(const a of model.seats) {
+      assert.ok(a.x-model.radius>=0&&a.x+model.radius<=640&&a.y-model.radius>=0&&a.y+model.radius<=340);
+      for(const b of model.seats)if(a.index!==b.index)assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>model.radius*2);
+    }
   }
 });

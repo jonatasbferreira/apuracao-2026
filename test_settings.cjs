@@ -30,3 +30,11 @@ test('a later explicit choice to disable auto refresh is preserved',()=>{
   assert.equal(read({auto:false,autoDefaultVersion:1,pinsVersion:1}).auto,false);
   assert.equal(read({autoDefaultVersion:1,pinsVersion:1}).auto,true);
 });
+test('main tab and chamber choice are restored with conservative defaults',()=>{
+  assert.equal(read(null).page,'results');
+  assert.equal(read(null).benchMode,'federal-br');
+  const saved=read({page:'benches',benchMode:'state-ce'});
+  assert.equal(saved.page,'benches');assert.equal(saved.benchMode,'state-ce');
+  const invalid=read({page:'unknown',benchMode:'unknown'});
+  assert.equal(invalid.page,'results');assert.equal(invalid.benchMode,'federal-br');
+});
