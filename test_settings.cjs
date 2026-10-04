@@ -20,3 +20,13 @@ test('removing Wagner after migration is respected on subsequent reloads',()=>{
 test('fresh visitors see Wagner in senate favorites',()=>{
   assert.equal(read(null).pins['5'].includes('445'),true);
 });
+test('auto refresh defaults to enabled for fresh and older saved settings',()=>{
+  assert.equal(read(null).auto,true);
+  assert.equal(read({auto:false,pinsVersion:1}).auto,true);
+  assert.equal(read({auto:true,pinsVersion:1}).auto,true);
+  assert.equal(read(null).autoDefaultVersion,1);
+});
+test('a later explicit choice to disable auto refresh is preserved',()=>{
+  assert.equal(read({auto:false,autoDefaultVersion:1,pinsVersion:1}).auto,false);
+  assert.equal(read({autoDefaultVersion:1,pinsVersion:1}).auto,true);
+});

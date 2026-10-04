@@ -3,13 +3,13 @@ const directTSE = !['127.0.0.1','localhost','::1'].includes(location.hostname);
 const titles = {'1':'Presidente', '3':'Governador', '5':'Senador', '6':'Deputado federal', '7':'Deputado estadual'};
 const colors = {'1':'#337e98', '3':'#21725b', '5':'#b18c32', '6':'#456d91', '7':'#8c5e78'};
 const defaults = {'1':[], '3':['45','13','14'], '5':['400','222','300','180','445'], '6':['2277'], '7':['22777']};
-let settings = {turn:'1', president:'br', auto:false, view:'regions', mapColor:'progress', pinsVersion:0, pins:structuredClone(defaults)};
+let settings = {turn:'1', president:'br', auto:true, autoDefaultVersion:1, view:'regions', mapColor:'progress', pinsVersion:0, pins:structuredClone(defaults)};
 try {
   const saved = JSON.parse(localStorage.getItem('apuracao-ce-v1'));
   if (saved) {
     settings.turn = ['1','2'].includes(saved.turn) ? saved.turn : '1';
     settings.president = ['br','ce'].includes(saved.president) ? saved.president : 'br';
-    settings.auto = saved.auto === true;
+    settings.auto = saved.autoDefaultVersion === 1 ? saved.auto !== false : true;
     settings.view = saved.view === 'map' ? 'map' : 'regions';
     settings.mapColor = saved.mapColor === 'region' ? 'region' : 'progress';
     settings.pinsVersion = Number(saved.pinsVersion) || 0;
@@ -18,6 +18,7 @@ try {
     }
   }
 } catch {}
+save();
 if (settings.pinsVersion<1) {
   if (!settings.pins['5'].includes('445')) settings.pins['5'].push('445');
   settings.pinsVersion=1;
