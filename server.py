@@ -63,6 +63,7 @@ def normalize(data, cargo, ciclo, election, uf, path):
                 seat_groups.append({
                     "name": group.get("nm") or group.get("com", ""),
                     "label": group.get("com") or " / ".join(p.get("sg", "") for p in group.get("par", [])),
+                    "parties": [p.get("sg", "") for p in group.get("par", [])],
                     "federation": group.get("tp") == "f",
                     "seats": int(group["vag"]) if group.get("vag") not in (None, "") else None,
                     "elected": sum(c.get("e") == "s" for p in group.get("par", []) for c in p.get("cand", [])),
@@ -247,7 +248,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if isinstance(error, HTTPError):
                     error.close()
                 self.send_json({"error": "Nao foi possivel obter o catalogo de eleicoes do TSE. Verifique sua conexao e tente novamente."}, 502)
-        elif url.path in ("/", "/index.html", "/app.js", "/style.css", "/geography.js", "/tse-client.js", "/d3.min.js", "/brasil-uf.geojson"):
+        elif url.path in ("/", "/index.html", "/app.js", "/style.css", "/geography.js", "/bancada.js", "/tse-client.js", "/d3.min.js", "/brasil-uf.geojson"):
             super().do_GET()
         else:
             self.send_error(404)

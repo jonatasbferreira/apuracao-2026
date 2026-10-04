@@ -66,6 +66,13 @@ O segundo turno pode ficar indisponivel ate o TSE publicar o catalogo e os
 arquivos correspondentes. O servidor aceita conexoes apenas em 127.0.0.1.
 # Versao online
 
+A simulacao da bancada federal do Ceara usa as vagas parciais do TSE por partido
+ou federacao. Nas federacoes, considera os candidatos mais votados do conjunto
+para estimar cadeiras por partido. As cores sao convencoes visuais do painel.
+Vagas sem candidato definido ficam cinzas. A legenda filtra partidos e as cadeiras
+abrem o detalhe nominal. Nao aplica regras individuais de elegibilidade ou
+desempates, portanto nao substitui a lista oficial de eleitos.
+
 Capitao Wagner (445) tambem fica fixado no Senado. A atualizacao adiciona esse
 favorito uma vez aos navegadores com preferencias antigas, preservando as demais
 selecoes. Ele pode ser removido normalmente no seletor de candidatos.

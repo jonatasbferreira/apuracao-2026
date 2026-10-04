@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minha apuração | Ceará 2026</title>
-  <link rel="stylesheet" href="./style.css?v=seats-1">
+  <link rel="stylesheet" href="./style.css?v=bancada-1">
   <script src="./d3.min.js" defer></script>
   <script src="./geography.js" defer></script>
-  <script src="./tse-client.js?v=seats-1" defer></script>
-  <script src="./app.js?v=auto-default-1" defer></script>
+  <script src="./tse-client.js?v=bancada-1" defer></script>
+  <script src="./bancada.js?v=bancada-1" defer></script>
+  <script src="./app.js?v=bancada-1" defer></script>
 </head>
 <body>
   <header>
@@ -23,6 +24,12 @@
     <div class="statusbar" role="status" aria-live="polite"><span id="connection">Consultando o TSE...</span><span id="checked"></span><span id="countdown">Atualização automática desligada</span></div>
     <div id="error" class="alert" role="alert" hidden></div>
     <div class="dashboard" id="dashboard"></div>
+    <section class="bench-section" aria-labelledby="bench-title">
+      <div class="bench-head"><div><h2 id="bench-title">Bancada federal · Ceará</h2><p id="bench-status">Simulação da distribuição de vagas</p></div><strong id="bench-count"></strong></div>
+      <div id="bench-warning" class="alert" hidden></div>
+      <div class="bench-layout"><div class="bench-chart"><svg id="bench-svg" viewBox="0 0 640 340" aria-label="Simulação de cadeiras da bancada federal do Ceará"></svg><div id="bench-legend" aria-label="Legenda dos partidos"></div></div><div id="bench-detail" aria-live="polite"></div></div>
+      <p class="bench-note">Simulação por votação nominal dentro das vagas do partido ou federação informadas pelo TSE. Não aplica critérios individuais de elegibilidade nem desempates; não é uma lista oficial de eleitos.</p>
+    </section>
     <section class="overview" aria-labelledby="overview-title">
       <div class="overview-head"><div><h2 id="overview-title">Apuração pelo Brasil</h2><p id="overview-scope">Presidente · Seções totalizadas</p></div><div id="overview-time" class="timestamps"></div></div>
       <div id="overview-error" class="alert" role="status" hidden></div>

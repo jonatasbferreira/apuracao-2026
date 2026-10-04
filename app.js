@@ -28,6 +28,7 @@ let races = {}, errors = {}, busy = false, due = Date.now() + 11000, pickerId, d
 let controller = null, epoch = 0, consulted = null;
 let overview = null, overviewError = '';
 let mapGeometry = null, mapPromise = null, focusedRegion = null;
+let benchParty=null, benchCandidate=null;
 let previewUf = null, previewTimer = null, previewRequest = null, previewCloseTimer = null;
 const previewCache = new Map();
 const integer = new Intl.NumberFormat('pt-BR');
@@ -79,6 +80,39 @@ function render() {
   document.querySelectorAll('[data-pick]').forEach(button => button.addEventListener('click', () => openPicker(button.dataset.pick)));
   $('president-scope').addEventListener('change', e => {settings.president = e.target.value; resetQuery('1');});
   renderOverview();
+  renderBench();
+}
+function renderBench() {
+  const race=races['6'], model=Bancada.simulate(race);
+  const scrollTop=$('bench-detail').querySelector('.bench-candidates')?.scrollTop || 0;
+  $('bench-warning').hidden=!errors['6'];
+  $('bench-warning').textContent=errors['6'] ? 'Dados federais indisponíveis. A simulação usa a última consulta recebida.' : '';
+  if(!model) {
+    $('bench-status').textContent='Simulação da distribuição de vagas';
+    $('bench-svg').innerHTML='';$('bench-legend').innerHTML='';$('bench-count').textContent='';
+    $('bench-detail').innerHTML='<p class="empty">Aguardando distribuição de vagas do TSE.</p>';return;
+  }
+  if(benchParty!==null&&!model.legend.some(item=>item.party===benchParty))benchParty=null;
+  if(benchCandidate&&!model.seats.some(seat=>seat.candidate?.number===benchCandidate))benchCandidate=null;
+  $('bench-status').textContent=`${race.finished ? 'Simulação com a totalização do TSE' : 'Simulação parcial'} · ${decimal.format(race.sectionPercent)}% apurado`;
+  $('bench-count').textContent=`${model.total} cadeiras`;
+  $('bench-svg').innerHTML=model.seats.map(seat=>{
+    const candidate=seat.candidate,selected=candidate?.number===benchCandidate;
+    const label=candidate ? `${candidate.name} · ${candidate.party} · ${integer.format(candidate.votes)} votos${candidate.elected ? ' · Eleito pelo TSE' : ' · Simulação'}${seat.tied ? ' · Empate na votação' : ''}` : seat.group;
+    return `<g class="bench-seat ${selected?'selected':''}" data-seat="${seat.index}" tabindex="0" role="button" aria-label="${esc(label)}" opacity="${benchParty!==null&&seat.party!==benchParty ? '.18' : '1'}"><title>${esc(label)}</title><circle cx="${seat.x}" cy="${seat.y}" r="21" fill="${seat.party ? Bancada.color(seat.party) : '#ccd4d0'}"/><text x="${seat.x}" y="${seat.y+4}" text-anchor="middle">${esc(candidate?.number || '—')}</text>${candidate&&settings.pins['6'].includes(candidate.number) ? `<circle class="bench-pin" cx="${seat.x+15}" cy="${seat.y-15}" r="5"/>` : ''}</g>`;
+  }).join('');
+  $('bench-legend').innerHTML=model.legend.map(item=>`<button class="bench-party ${benchParty===item.party?'active':''}" data-party="${esc(item.party)}" aria-pressed="${benchParty===item.party}"><i style="background:${item.color}"></i><span>${esc(item.label)}</span><strong>${item.seats}</strong></button>`).join('');
+  const visible=model.seats.filter(seat=>seat.candidate&&(benchParty===null||seat.party===benchParty));
+  const chosen=visible.find(seat=>seat.candidate.number===benchCandidate);
+  $('bench-detail').innerHTML=`<div class="bench-detail-head"><h3>${esc(benchParty===null ? 'Candidatos na simulação' : benchParty || 'A definir')}</h3><span>${benchParty===null ? model.defined : model.legend.find(item=>item.party===benchParty).seats} cadeiras</span></div>${chosen ? `<div class="bench-selection"><strong>${esc(chosen.candidate.name)}</strong><span>${esc(chosen.candidate.number)} · ${esc(chosen.candidate.party)} · ${integer.format(chosen.candidate.votes)} votos</span><small>${chosen.candidate.elected ? 'Eleito indicado pelo TSE' : chosen.tied ? 'Votação empatada no limite das vagas' : 'Presença estimada pela votação nominal'}</small></div>` : ''}<div class="bench-candidates">${visible.map(seat=>`<button data-candidate="${esc(seat.candidate.number)}" class="bench-person ${benchCandidate===seat.candidate.number?'active':''}"><i style="background:${Bancada.color(seat.party)}"></i><span><strong>${esc(seat.candidate.name)}</strong><small>${esc(seat.party)} · ${integer.format(seat.candidate.votes)} votos${seat.candidate.elected?' · Eleito TSE':''}${seat.tied?' · Empate':''}</small></span>${settings.pins['6'].includes(seat.candidate.number)?'<small class="pin">Fixado</small>':''}</button>`).join('') || '<p class="empty">Aguardando candidatos para essas vagas.</p>'}</div>`;
+  $('bench-legend').querySelectorAll('[data-party]').forEach(button=>button.addEventListener('click',()=>{benchParty=benchParty===button.dataset.party?null:button.dataset.party;benchCandidate=null;renderBench();}));
+  const selectSeat=seat=>{benchCandidate=seat.candidate?.number || null;benchParty=seat.party;renderBench();};
+  $('bench-svg').querySelectorAll('[data-seat]').forEach(element=>{
+    element.addEventListener('click',()=>selectSeat(model.seats[Number(element.dataset.seat)]));
+    element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectSeat(model.seats[Number(element.dataset.seat)]);}});
+  });
+  $('bench-detail').querySelectorAll('[data-candidate]').forEach(button=>button.addEventListener('click',()=>{benchCandidate=button.dataset.candidate;renderBench();}));
+  $('bench-detail').querySelector('.bench-candidates').scrollTop=scrollTop;
 }
 function renderOverview() {
   $('overview-scope').textContent = `Presidente · ${settings.turn}º turno · Seções totalizadas`;

@@ -68,7 +68,7 @@
       }
     }
     const s = data.s, v = data.v;
-    const seatGroups = proportional ? (cargoData?.agr || []).map(g=>({name:g.nm || g.com || '',label:g.com || (g.par || []).map(p=>p.sg).join(' / '),federation:g.tp==='f',seats:g.vag!=null && g.vag!=='' ? number(g.vag) : null,elected:(g.par || []).reduce((sum,p)=>sum+(p.cand || []).filter(c=>c.e==='s').length,0)})).sort((a,b)=>(b.seats || 0)-(a.seats || 0) || a.label.localeCompare(b.label)) : undefined;
+    const seatGroups = proportional ? (cargoData?.agr || []).map(g=>({name:g.nm || g.com || '',label:g.com || (g.par || []).map(p=>p.sg).join(' / '),parties:(g.par || []).map(p=>p.sg || ''),federation:g.tp==='f',seats:g.vag!=null && g.vag!=='' ? number(g.vag) : null,elected:(g.par || []).reduce((sum,p)=>sum+(p.cand || []).filter(c=>c.e==='s').length,0)})).sort((a,b)=>(b.seats || 0)-(a.seats || 0) || a.label.localeCompare(b.label)) : undefined;
     return {id:cargo,name:cargos[cargo],uf:uf.toUpperCase(),candidates,seatGroups,totalSeats:proportional && cargoData?.nv!=null && cargoData.nv!=='' ? number(cargoData.nv) : null,source:base+path,generated:generated(data),totalized:`${data.dt || ''} ${data.ht || ''}`.trim(),generationId:data.idg,
       sections:number(s.st),totalSections:number(s.ts),sectionPercent:number(s.pst),totalVotes:number(v.tv),whiteVotes:number(v.vb),whitePercent:number(v.pvb),nullVotes:number(v.tvn),nullPercent:number(v.ptvn),finished:data.tf==='s'};
   }
